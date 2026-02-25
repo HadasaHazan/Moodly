@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MessageCircle, ChevronDown, ChevronUp, CheckCircle, Lightbulb } from 'lucide-react';
 import { EMOTIONS } from '../constants/emotions';
-import { getBotDailySummary, updateBotConversationTask, getLanguage } from '../utils/storage';
+import { getBotDailySummary, updateBotConversationTask, getLanguage, getUiTheme } from '../utils/storage';
 import { isRtlLanguage } from '../constants/i18n';
 
 const TASK_STATUS_LABEL = {
@@ -42,6 +42,8 @@ const BotDailySummary = ({ onOpenBot }) => {
   const [reactionBurst, setReactionBurst] = useState([]);
   const [movedTaskId, setMovedTaskId] = useState(null);
   const language = getLanguage();
+  const uiTheme = getUiTheme();
+  const isLight = uiTheme === 'light';
   const isRtl = isRtlLanguage(language);
 
   const loadConversations = () => {
@@ -253,7 +255,9 @@ const BotDailySummary = ({ onOpenBot }) => {
                                       onClick={() => updateConversation(conv.id, { taskStatus: 'pending' })}
                                       className={`px-3 py-1.5 rounded-lg text-xs border ${
                                         conv.taskStatus === 'pending'
-                                          ? 'bg-slate-700 text-slate-100 border-slate-500'
+                                          ? isLight
+                                            ? 'bg-white text-slate-800 border-slate-300'
+                                            : 'bg-slate-700 text-slate-100 border-slate-500'
                                           : 'bg-slate-900 text-slate-400 border-slate-700'
                                       }`}
                                     >

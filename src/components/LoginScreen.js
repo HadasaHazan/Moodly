@@ -1,18 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Settings as SettingsIcon, Sparkles, Users, User, HelpCircle, ChevronDown } from 'lucide-react';
+import { Settings as SettingsIcon, Sparkles, Users, User, ChevronDown } from 'lucide-react';
 import {
   getLanguage,
+  getUiTheme,
   setAuthSession,
   setUserContext
 } from '../utils/storage';
 import { isRtlLanguage } from '../constants/i18n';
 import { SCHOOLS } from '../constants/schools';
+import HelpPopover from './HelpPopover';
 
 const TEXTS = {
   he: {
     title: 'כניסה למערכת',
-    subtitle: 'בחרו סוג כניסה והזינו פרטים',
     general: 'צפייה בנתוני הכיתה',
     personal: 'כניסה',
     generalHelp: 'צפייה בנתוני הכיתה מציגה סטטוס כיתה (גרפים יומיים/שבועיים) בלי נתונים אישיים.',
@@ -31,7 +31,6 @@ const TEXTS = {
   },
   en: {
     title: 'System Login',
-    subtitle: 'Choose login type and fill in details',
     general: 'Class View',
     personal: 'Login',
     generalHelp: 'Class view shows class status (daily/weekly charts) without personal data.',
@@ -63,6 +62,7 @@ const getDeviceId = () => {
 
 const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
   const language = getLanguage();
+  const uiTheme = getUiTheme();
   const isRtl = isRtlLanguage(language);
   const t = language === 'en' ? TEXTS.en : TEXTS.he;
 
@@ -90,89 +90,22 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
     return () => document.removeEventListener('mousedown', onMouseDown);
   }, [isSchoolOpen]);
 
-  const HelpPopover = ({ id, text }) => {
-    const buttonRef = useRef(null);
-    const popoverRef = useRef(null);
-    const isOpen = activeHelp === id;
-    const [anchorRect, setAnchorRect] = useState(null);
-
-    const updateRect = () => {
-      const rect = buttonRef.current?.getBoundingClientRect();
-      if (rect) setAnchorRect(rect);
-    };
-
-    useEffect(() => {
-      if (!isOpen) return undefined;
-      updateRect();
-
-      const onScroll = () => updateRect();
-      const onResize = () => updateRect();
-      window.addEventListener('scroll', onScroll, true);
-      window.addEventListener('resize', onResize);
-
-      const onMouseDown = (event) => {
-        const target = event.target;
-        if (buttonRef.current && buttonRef.current.contains(target)) return;
-        if (popoverRef.current && popoverRef.current.contains(target)) return;
-        setActiveHelp(null);
-      };
-      document.addEventListener('mousedown', onMouseDown);
-
-      return () => {
-        window.removeEventListener('scroll', onScroll, true);
-        window.removeEventListener('resize', onResize);
-        document.removeEventListener('mousedown', onMouseDown);
-      };
-    }, [isOpen]);
-
-    const tooltip = (() => {
-      if (!isOpen || !anchorRect) return null;
-
-      const padding = 12;
-      const tooltipWidth = 280;
-      const estimatedHeight = 110;
-
-      let left = isRtl ? anchorRect.right - tooltipWidth : anchorRect.left;
-      left = Math.min(Math.max(padding, left), window.innerWidth - tooltipWidth - padding);
-
-      let top = anchorRect.bottom + 8;
-      if (top + estimatedHeight > window.innerHeight - padding) {
-        top = anchorRect.top - 8 - estimatedHeight;
-      }
-      top = Math.min(Math.max(padding, top), window.innerHeight - estimatedHeight - padding);
-
-      return createPortal(
-        <div
-          ref={popoverRef}
-          className="text-xs rounded-xl border p-3 shadow-xl backdrop-blur-sm bg-slate-900/95 text-slate-100 border-slate-600"
-          style={{ position: 'fixed', top, left, width: tooltipWidth, zIndex: 200 }}
-          dir={isRtl ? 'rtl' : 'ltr'}
-        >
-          {text}
-        </div>,
-        document.body
-      );
-    })();
-
-    return (
-      <span className="inline-flex">
-        <button
-          ref={buttonRef}
-          onClick={(e) => {
-            e.stopPropagation();
-            setActiveHelp(isOpen ? null : id);
-          }}
-          className="text-slate-300 hover:text-slate-100"
-          aria-expanded={isOpen ? 'true' : 'false'}
-          aria-label={language === 'en' ? 'Help' : 'עזרה'}
-          type="button"
-        >
-          <HelpCircle className="w-4 h-4" />
-        </button>
-        {tooltip}
-      </span>
-    );
-  };
+  const renderHelp = (id, text) => (
+    <HelpPopover
+      id={id}
+      text={text}
+      activeId={activeHelp}
+      setActiveId={setActiveHelp}
+      isRtl={isRtl}
+      theme={uiTheme}
+      ariaLabel={language === 'en' ? 'Help' : 'עזרה'}
+      width={280}
+      estimatedHeight={110}
+      buttonClassName="text-slate-300 hover:text-slate-100"
+      iconClassName="w-4 h-4"
+      as="span"
+    />
+  );
 
   const handleLogin = () => {
     const normalizedClass = classId.trim();
@@ -260,7 +193,7 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
             >
               <span className="inline-flex items-center justify-center gap-2">
                 {t.personal}
-                <HelpPopover id="personal" text={t.personalHelp} />
+                {renderHelp('personal', t.personalHelp)}
               </span>
             </button>
             <button
@@ -275,7 +208,7 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
             >
               <span className="inline-flex items-center justify-center gap-2">
                 {t.general}
-                <HelpPopover id="general" text={t.generalHelp} />
+                {renderHelp('general', t.generalHelp)}
               </span>
             </button>
           </div>
@@ -294,7 +227,7 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
                   type="button"
                   onClick={() => setIsSchoolOpen((prev) => !prev)}
                   className={`w-full bg-slate-800 border border-slate-600 hover:bg-slate-700 rounded-xl px-4 py-3 text-slate-100 flex items-center justify-between transition-all focus:outline-none focus:ring-2 focus:ring-indigo-400 ${
-                    isRtl ? '' : 'flex-row-reverse'
+                    isRtl ? 'flex-row-reverse' : ''
                   }`}
                   dir={isRtl ? 'rtl' : 'ltr'}
                   aria-haspopup="listbox"

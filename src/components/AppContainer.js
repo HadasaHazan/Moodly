@@ -6,6 +6,7 @@ import Moodly from './Moodly';
 import ChartsScreen from './ChartsScreen';
 import Settings from './Settings';
 import FixedNavigation from './FixedNavigation';
+import TaskTracker from './TaskTracker';
 import {
   getAuthSession,
   getBackgroundMusic,
@@ -23,7 +24,7 @@ const hasValidSession = (session, user) =>
   Boolean(user && session?.userKey && (session.role === 'general' || session.role === 'personal'));
 
 const AppContainer = () => {
-  const [currentScreen, setCurrentScreen] = useState('login'); // login, botMode, main, bottle, charts
+  const [currentScreen, setCurrentScreen] = useState('login'); // login, botMode, main, bottle, charts, tasks
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [currentUser, setCurrentUserState] = useState(null);
   const [language, setLanguageState] = useState('he');
@@ -115,6 +116,10 @@ const AppContainer = () => {
     setCurrentScreen('charts');
   };
 
+  const handleOpenTasks = () => {
+    setCurrentScreen('tasks');
+  };
+
   const handleOpenSettings = () => {
     setLanguageState(getLanguage());
     setUiThemeState(getUiTheme());
@@ -139,7 +144,7 @@ const AppContainer = () => {
     setCurrentScreen('login');
   };
 
-  const screensWithNavigation = ['main', 'bottle', 'charts'];
+  const screensWithNavigation = ['main', 'bottle', 'charts', 'tasks'];
   const showNavigation = currentUser && screensWithNavigation.includes(currentScreen);
   const authSession = getAuthSession();
   const isGeneral = authSession?.role === 'general';
@@ -176,7 +181,7 @@ const AppContainer = () => {
         <MainScreen
           onOpenBottle={handleOpenBottle}
           onOpenCharts={handleOpenCharts}
-          onOpenSettings={handleOpenSettings}
+          onOpenTasks={handleOpenTasks}
         />
       )}
 
@@ -188,9 +193,13 @@ const AppContainer = () => {
         <ChartsScreen onBack={handleBackToMain} onBackToLogin={handleBackToLogin} />
       )}
 
+      {currentScreen === 'tasks' && currentUser && (
+        <TaskTracker isModal={false} onClose={handleBackToMain} />
+      )}
+
       {isSettingsOpen && (
         <div
-          className="fixed inset-0 z-[90] bg-slate-950/65 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5"
+          className="fixed inset-0 z-[90] bg-slate-950/35 backdrop-blur-md backdrop-saturate-150 flex items-center justify-center p-3 sm:p-5"
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsSettingsOpen(false);
           }}

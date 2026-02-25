@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Globe, Bot, Sparkles, HelpCircle, Music, ChevronDown, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Globe, Bot, Sparkles, Music, ChevronDown, X } from 'lucide-react';
 import {
   getBotMode,
   setBotMode,
@@ -14,6 +13,7 @@ import {
   setBackgroundMusic
 } from '../utils/storage';
 import { translate as t, isRtlLanguage } from '../constants/i18n';
+import HelpPopover from './HelpPopover';
 
 const Settings = ({ onBack, onThemePreview, onPalettePreview, onMusicPreview, isModal = false, hideBotMode = false }) => {
   const [language, setLanguageState] = useState('he');
@@ -52,101 +52,21 @@ const Settings = ({ onBack, onThemePreview, onPalettePreview, onMusicPreview, is
     window.dispatchEvent(new Event('languagechange'));
   };
 
-  const HelpPopover = ({ id, text }) => {
-    const buttonRef = useRef(null);
-    const popoverRef = useRef(null);
-    const isOpen = activeHelp === id;
-    const [anchorRect, setAnchorRect] = useState(null);
-
-    const updateRect = () => {
-      const rect = buttonRef.current?.getBoundingClientRect();
-      if (rect) setAnchorRect(rect);
-    };
-
-    useEffect(() => {
-      if (!isOpen) return undefined;
-      updateRect();
-
-      const onScroll = () => updateRect();
-      const onResize = () => updateRect();
-      window.addEventListener('scroll', onScroll, true);
-      window.addEventListener('resize', onResize);
-
-      const onMouseDown = (event) => {
-        const target = event.target;
-        if (buttonRef.current && buttonRef.current.contains(target)) return;
-        if (popoverRef.current && popoverRef.current.contains(target)) return;
-        setActiveHelp(null);
-      };
-      document.addEventListener('mousedown', onMouseDown);
-
-      return () => {
-        window.removeEventListener('scroll', onScroll, true);
-        window.removeEventListener('resize', onResize);
-        document.removeEventListener('mousedown', onMouseDown);
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [isOpen, id]);
-
-    const tooltip = (() => {
-      if (!isOpen || !anchorRect) return null;
-
-      const padding = 12;
-      const tooltipWidth = 260;
-      const estimatedHeight = 130;
-
-      let left = isRtl ? anchorRect.right - tooltipWidth : anchorRect.left;
-      left = Math.min(Math.max(padding, left), window.innerWidth - tooltipWidth - padding);
-
-      let top = anchorRect.bottom + 8;
-      if (top + estimatedHeight > window.innerHeight - padding) {
-        top = anchorRect.top - 8 - estimatedHeight;
-      }
-      top = Math.min(Math.max(padding, top), window.innerHeight - estimatedHeight - padding);
-
-      const themeClasses =
-        uiTheme === 'light'
-          ? 'bg-white/95 text-slate-800 border-slate-300'
-          : 'bg-slate-800/95 text-slate-100 border-slate-500';
-
-      return createPortal(
-        <div
-          ref={popoverRef}
-          className={`text-xs rounded-xl border p-3 shadow-xl backdrop-blur-sm ${themeClasses}`}
-          style={{
-            position: 'fixed',
-            top,
-            left,
-            width: tooltipWidth,
-            zIndex: 200
-          }}
-        >
-          {text}
-        </div>,
-        document.body
-      );
-    })();
-
-    return (
-      <span className="inline-flex">
-        <button
-          ref={buttonRef}
-          onClick={(e) => {
-            e.stopPropagation();
-            setActiveHelp(isOpen ? null : id);
-          }}
-          className="text-slate-400 hover:text-slate-200"
-          aria-expanded={isOpen ? 'true' : 'false'}
-          aria-label={language === 'en' ? 'Help' : 'עזרה'}
-        >
-          <HelpCircle className="w-4 h-4" />
-        </button>
-        {tooltip}
-      </span>
-    );
-  };
-
-  const renderHelp = (id, text) => <HelpPopover id={id} text={text} />;
+  const renderHelp = (id, text) => (
+    <HelpPopover
+      id={id}
+      text={text}
+      activeId={activeHelp}
+      setActiveId={setActiveHelp}
+      isRtl={isRtl}
+      theme={uiTheme}
+      ariaLabel={language === 'en' ? 'Help' : 'עזרה'}
+      width={260}
+      estimatedHeight={130}
+      buttonClassName="text-slate-400 hover:text-slate-200"
+      iconClassName="w-4 h-4"
+    />
+  );
 
   const selectedMusic = musicOptions.find((option) => option.id === bgMusic) || musicOptions[0];
 
@@ -175,24 +95,38 @@ const Settings = ({ onBack, onThemePreview, onPalettePreview, onMusicPreview, is
     <div className={isModal ? 'p-2' : 'min-h-screen p-4'}>
       <div className={`max-w-2xl mx-auto relative ${isModal ? 'rounded-3xl settings-shell p-4 sm:p-6' : 'pt-8'}`}>
         {isModal && onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className={`absolute top-4 ${isRtl ? 'left-4' : 'right-4'} w-11 h-11 flex items-center justify-center bg-slate-900/80 hover:bg-slate-800 text-slate-200 rounded-xl shadow-lg transition-all duration-200 border border-slate-700`}
-            aria-label={language === 'en' ? 'Close settings' : 'סגור הגדרות'}
-            title={language === 'en' ? 'Close' : 'סגור'}
-          >
-            <X className="w-5 h-5" />
-          </button>
-        )}
+	          <button
+	            type="button"
+	            onClick={onBack}
+	            className={`absolute top-4 ${isRtl ? 'right-4' : 'left-4'} z-[210] pointer-events-auto w-11 h-11 flex items-center justify-center bg-slate-900/80 hover:bg-slate-800 text-slate-200 rounded-xl shadow-lg transition-all duration-200 border border-slate-700`}
+	            aria-label={language === 'en' ? 'Close settings' : 'סגור הגדרות'}
+	            title={language === 'en' ? 'Close' : 'סגור'}
+	          >
+	            <X className="w-5 h-5" />
+	          </button>
+	        )}
         {/* כפתור חזרה - מוסר כי יש ניווט קבוע */}
 
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-extrabold settings-hero-title mb-2 flex items-center justify-center gap-3">
-            <Sparkles className={`w-10 h-10 ${uiTheme === 'light' ? 'text-indigo-600' : 'text-indigo-300'}`} />
-            {t(language, 'settings')}
-          </h1>
-        </div>
+	        <div className="text-center mb-8">
+	          <h1
+	            className={`text-4xl font-extrabold mb-2 inline-flex items-center justify-center gap-3 px-5 py-3 rounded-2xl border backdrop-blur-sm ${
+	              uiTheme === 'light'
+	                ? 'bg-gradient-to-r from-indigo-600 to-cyan-600 text-white border-white/60 shadow-[0_26px_70px_rgba(15,23,42,0.28)]'
+	                : 'bg-slate-950/45 border-slate-700 shadow-[0_24px_65px_rgba(0,0,0,0.35)]'
+	            }`}
+	          >
+	            <Sparkles className={`w-10 h-10 ${uiTheme === 'light' ? 'text-white' : 'text-indigo-300'}`} />
+	            <span
+	              className={
+	                uiTheme === 'light'
+	                  ? 'text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.25)]'
+	                  : 'settings-hero-title'
+	              }
+	            >
+	              {t(language, 'settings')}
+	            </span>
+	          </h1>
+	        </div>
 
         <div className="space-y-6">
           <div className="bg-slate-900/80 rounded-2xl shadow-xl p-6 border border-slate-700">
@@ -335,7 +269,7 @@ const Settings = ({ onBack, onThemePreview, onPalettePreview, onMusicPreview, is
             <div className="relative">
               <button
                 onClick={() => setIsMusicOpen((prev) => !prev)}
-                className={`w-full bg-slate-800 border-2 border-slate-600 hover:bg-slate-700 rounded-2xl px-4 py-3 text-slate-100 flex items-center justify-between transition-all ${isRtl ? '' : 'flex-row-reverse'}`}
+                className={`w-full bg-slate-800 border-2 border-slate-600 hover:bg-slate-700 rounded-2xl px-4 py-3 text-slate-100 flex items-center justify-between transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
                 dir={isRtl ? 'rtl' : 'ltr'}
               >
                 <span className="font-semibold">{selectedMusic.label}</span>
@@ -343,7 +277,7 @@ const Settings = ({ onBack, onThemePreview, onPalettePreview, onMusicPreview, is
               </button>
 
               {isMusicOpen && (
-                <div className="absolute z-20 mt-2 w-full bg-slate-900/95 border border-slate-600 rounded-2xl shadow-2xl p-2 backdrop-blur-sm">
+                <div className="absolute z-20 bottom-full mb-2 w-full bg-slate-900/95 border border-slate-600 rounded-2xl shadow-2xl p-2 backdrop-blur-sm">
                   <div className="space-y-2">
                     {musicOptions.map((option) => (
                       <button

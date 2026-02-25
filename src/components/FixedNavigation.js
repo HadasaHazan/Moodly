@@ -37,7 +37,18 @@ const FixedNavigation = ({
   }, [propLanguage]);
 
   return (
-    <div className={`fixed ${isRtl ? 'top-4 right-4' : 'top-4 left-4'} z-50 flex gap-3 ${isRtl ? 'flex-row' : 'flex-row-reverse'}`}>
+    <div className={`fixed ${isRtl ? 'top-4 right-4 flex-row-reverse' : 'top-4 left-4 flex-row'} z-50 flex gap-3`}>
+      {/* כפתור הגדרות */}
+      {!hideSettings && (
+        <button
+          onClick={onOpenSettings}
+          className="w-11 h-11 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm hover:bg-slate-800 text-slate-200 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105 border border-slate-700"
+          title={language === 'en' ? 'Settings' : 'הגדרות'}
+        >
+          <Settings className="w-5 h-5" />
+        </button>
+      )}
+
       {/* כפתור חזרה */}
       {!hideBack && (
         <button
@@ -51,17 +62,6 @@ const FixedNavigation = ({
           title={resolvedTitle}
         >
           <ArrowLeft className={`w-5 h-5 ${isRtl ? 'rotate-180' : ''}`} />
-        </button>
-      )}
-      
-      {/* כפתור הגדרות */}
-      {!hideSettings && (
-        <button
-          onClick={onOpenSettings}
-          className="w-11 h-11 flex items-center justify-center bg-slate-900/90 backdrop-blur-sm hover:bg-slate-800 text-slate-200 rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105 border border-slate-700"
-          title={language === 'en' ? 'Settings' : 'הגדרות'}
-        >
-          <Settings className="w-5 h-5" />
         </button>
       )}
     </div>

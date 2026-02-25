@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, HelpCircle } from 'lucide-react';
+import { MessageCircle } from 'lucide-react';
 import { EMOTIONS } from '../constants/emotions';
 import { 
   addEmotionToBottle, 
@@ -11,8 +11,8 @@ import {
 } from '../utils/storage';
 import MoodBot from './MoodBot';
 import DailySummaryBot from './DailySummaryBot';
-import BotDailySummary from './BotDailySummary';
 import { translate as t, isRtlLanguage } from '../constants/i18n';
+import HelpPopover from './HelpPopover';
 
 const Moodly = ({ onBack }) => {
   const [bottleData, setBottleData] = useState({});
@@ -21,17 +21,15 @@ const Moodly = ({ onBack }) => {
   const [showBot, setShowBot] = useState(false);
   const [showDailyBot, setShowDailyBot] = useState(false);
   const [botMode, setBotMode] = useState('immediate');
-  const [summaryRefresh, setSummaryRefresh] = useState(0);
+  const [activeHelp, setActiveHelp] = useState(null);
   
   // אנימציית סמילי נופל
   const [flyingEmoji, setFlyingEmoji] = useState(null);
   const [showSplash, setShowSplash] = useState(false);
   const [newEmojiKey, setNewEmojiKey] = useState(0);
   const [isDesktopWide, setIsDesktopWide] = useState(() => window.innerWidth >= 1024);
-  const [language, setLanguage] = useState('he');
-  const [uiTheme, setUiTheme] = useState('dark');
-  const [showEmotionBotHelp, setShowEmotionBotHelp] = useState(false);
-  const [showDailyBotHelp, setShowDailyBotHelp] = useState(false);
+  const language = getLanguage();
+  const uiTheme = getUiTheme();
   const isRtl = isRtlLanguage(language);
   
   const bottleRef = useRef(null);
@@ -40,8 +38,6 @@ const Moodly = ({ onBack }) => {
   useEffect(() => {
     updateBottleData();
     setBotMode(getBotMode());
-    setLanguage(getLanguage());
-    setUiTheme(getUiTheme());
   }, []);
 
   useEffect(() => {
@@ -186,31 +182,28 @@ const Moodly = ({ onBack }) => {
         {/* כפתור חזרה - מוסר כי יש ניווט קבוע */}
 
         {/* כותרת */}
-        <div className="text-center mb-6 animate-fadeIn">
-          <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-teal-200 to-sky-100 bg-clip-text text-transparent mb-2">
+        <div className="title-banner text-center mb-6 animate-fadeIn px-5 py-5 sm:px-7 sm:py-6">
+          <h1 className="text-4xl sm:text-5xl font-extrabold hero-title mb-2">
             {t(language, 'jarTitle')}
           </h1>
           <div className="flex items-center justify-center gap-2">
             <p className="text-lg text-slate-300">{t(language, 'clickEmotionToAdd')}</p>
             {botMode === 'immediate' && (
-              <button
-                onClick={() => setShowEmotionBotHelp((prev) => !prev)}
-                className="text-cyan-300 hover:text-cyan-200 transition-colors"
-                title={language === 'en' ? 'About Bot per Emotion' : 'הסבר על בוט לכל רגש'}
-              >
-                <HelpCircle className="w-5 h-5" />
-              </button>
+              <HelpPopover
+                id="immediateBot"
+                text={t(language, 'immediateBotHelp')}
+                activeId={activeHelp}
+                setActiveId={setActiveHelp}
+                isRtl={isRtl}
+                theme={uiTheme}
+                ariaLabel={language === 'en' ? 'About Bot per Emotion' : 'הסבר על בוט לכל רגש'}
+                width={320}
+                estimatedHeight={170}
+                buttonClassName="text-cyan-300 hover:text-cyan-200 transition-colors"
+                iconClassName="w-5 h-5"
+              />
             )}
           </div>
-          {showEmotionBotHelp && botMode === 'immediate' && (
-            <div className={`mt-3 max-w-xl mx-auto border rounded-xl p-3 text-sm ${isRtl ? 'text-right' : 'text-left'} ${
-              uiTheme === 'light'
-                ? 'bg-white/95 border-slate-300 text-slate-800'
-                : 'bg-slate-800/95 border-slate-500 text-slate-100'
-            }`}>
-              {t(language, 'immediateBotHelp')}
-            </div>
-          )}
         </div>
 
         {/* אזור הצנצנת והרגשות */}
@@ -334,30 +327,22 @@ const Moodly = ({ onBack }) => {
               <MessageCircle className="w-6 h-6" />
               <span>{t(language, 'talkWithBot')}</span>
             </button>
-            <button
-              onClick={() => setShowDailyBotHelp((prev) => !prev)}
-              className="text-cyan-300 hover:text-cyan-200 transition-colors flex items-center gap-2 text-sm"
-            >
-              <HelpCircle className="w-4 h-4" />
-              <span>{language === 'en' ? 'What is this bot?' : 'מה זה הבוט הזה?'}</span>
-            </button>
-            {showDailyBotHelp && (
-              <div className={`max-w-xl border rounded-xl p-3 text-sm ${isRtl ? 'text-right' : 'text-left'} ${
-                uiTheme === 'light'
-                  ? 'bg-white/95 border-slate-300 text-slate-800'
-                  : 'bg-slate-800/95 border-slate-500 text-slate-100'
-              }`}>
-                {t(language, 'dailyBotHelp')}
-              </div>
-            )}
+            <HelpPopover
+              id="dailyBot"
+              text={t(language, 'dailyBotHelp')}
+              activeId={activeHelp}
+              setActiveId={setActiveHelp}
+              isRtl={isRtl}
+              theme={uiTheme}
+              ariaLabel={language === 'en' ? 'What is this bot?' : 'מה זה הבוט הזה?'}
+              width={320}
+              estimatedHeight={170}
+              buttonClassName="text-cyan-300 hover:text-cyan-200 transition-colors flex items-center gap-2 text-sm"
+              iconClassName="w-4 h-4"
+              label={<span>{language === 'en' ? 'What is this bot?' : 'מה זה הבוט הזה?'}</span>}
+            />
           </div>
         )}
-
-        {/* סיכום שיחות הבוט */}
-        <BotDailySummary 
-          key={summaryRefresh}
-          onOpenBot={() => setShowDailyBot(true)}
-        />
 
         {/* הודעה */}
         <div className="mt-6 bg-slate-900/70 backdrop-blur-sm border border-indigo-500/30 rounded-2xl p-4 text-center shadow-md">
@@ -374,7 +359,6 @@ const Moodly = ({ onBack }) => {
           onClose={() => {
             setShowBot(false);
             setSelectedEmotion(null);
-            setSummaryRefresh(prev => prev + 1);
           }}
         />
       )}
@@ -384,7 +368,6 @@ const Moodly = ({ onBack }) => {
         <DailySummaryBot
           onClose={() => {
             setShowDailyBot(false);
-            setSummaryRefresh(prev => prev + 1);
           }}
         />
       )}

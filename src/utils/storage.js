@@ -13,6 +13,11 @@ const GLOBAL_UI_THEME_KEY = `${APP_STORAGE_PREFIX}GlobalUiTheme`;
 const GLOBAL_BG_MUSIC_KEY = `${APP_STORAGE_PREFIX}GlobalBgMusic`;
 const GLOBAL_BOT_MODE_KEY = `${APP_STORAGE_PREFIX}GlobalBotMode`;
 
+const getGlobalPreference = (key, fallback) => {
+  const value = localStorage.getItem(key);
+  return value || fallback;
+};
+
 const formatLocalDate = (date) => {
   const year = date.getFullYear();
   const month = `${date.getMonth() + 1}`.padStart(2, '0');
@@ -24,12 +29,12 @@ const createDefaultUserData = (today) => ({
   dailyBottle: {},
   weeklyData: {},
   lastResetDate: today,
-  botMode: 'immediate', // 'immediate' or 'daily'
+  botMode: getGlobalPreference(GLOBAL_BOT_MODE_KEY, 'immediate'), // 'immediate' or 'daily'
   botConversations: {},
-  language: 'he',
-  uiTheme: 'dark',
-  bgPalette: 'calm',
-  bgMusic: 'off'
+  language: getGlobalPreference(GLOBAL_LANGUAGE_KEY, 'he'),
+  uiTheme: getGlobalPreference(GLOBAL_UI_THEME_KEY, 'dark'),
+  bgPalette: getGlobalPreference(GLOBAL_BG_PALETTE_KEY, 'calm'),
+  bgMusic: getGlobalPreference(GLOBAL_BG_MUSIC_KEY, 'off')
 });
 
 const ensureUserData = (data, username, today = getTodayDate()) => {
@@ -41,12 +46,12 @@ const ensureUserData = (data, username, today = getTodayDate()) => {
   if (!data[username].dailyBottle) data[username].dailyBottle = {};
   if (!data[username].weeklyData) data[username].weeklyData = {};
   if (!data[username].lastResetDate) data[username].lastResetDate = today;
-  if (!data[username].botMode) data[username].botMode = 'immediate';
+  if (!data[username].botMode) data[username].botMode = getGlobalPreference(GLOBAL_BOT_MODE_KEY, 'immediate');
   if (!data[username].botConversations) data[username].botConversations = {};
-  if (!data[username].language) data[username].language = 'he';
-  if (!data[username].uiTheme) data[username].uiTheme = 'dark';
-  if (!data[username].bgPalette) data[username].bgPalette = 'calm';
-  if (!data[username].bgMusic) data[username].bgMusic = 'off';
+  if (!data[username].language) data[username].language = getGlobalPreference(GLOBAL_LANGUAGE_KEY, 'he');
+  if (!data[username].uiTheme) data[username].uiTheme = getGlobalPreference(GLOBAL_UI_THEME_KEY, 'dark');
+  if (!data[username].bgPalette) data[username].bgPalette = getGlobalPreference(GLOBAL_BG_PALETTE_KEY, 'calm');
+  if (!data[username].bgMusic) data[username].bgMusic = getGlobalPreference(GLOBAL_BG_MUSIC_KEY, 'off');
 
   return data[username];
 };
@@ -371,18 +376,19 @@ export const getWeeklyData = () => {
 export const getBotMode = () => {
   const data = getData();
   const username = getCurrentUser();
+  const globalValue = getGlobalPreference(GLOBAL_BOT_MODE_KEY, 'immediate');
   if (!username) {
-    return localStorage.getItem(GLOBAL_BOT_MODE_KEY) || 'immediate';
+    return globalValue;
   }
-  return data[username]?.botMode || 'immediate';
+  return data[username]?.botMode || globalValue;
 };
 
 // עדכון מצב הבוט
 export const setBotMode = (mode) => {
   const data = getData();
   const username = getCurrentUser();
+  localStorage.setItem(GLOBAL_BOT_MODE_KEY, mode);
   if (!username) {
-    localStorage.setItem(GLOBAL_BOT_MODE_KEY, mode);
     window.dispatchEvent(new Event('botmodechange'));
     return;
   }
@@ -396,17 +402,18 @@ export const setBotMode = (mode) => {
 export const getLanguage = () => {
   const data = getData();
   const username = getCurrentUser();
+  const globalValue = getGlobalPreference(GLOBAL_LANGUAGE_KEY, 'he');
   if (!username) {
-    return localStorage.getItem(GLOBAL_LANGUAGE_KEY) || 'he';
+    return globalValue;
   }
-  return data[username]?.language || 'he';
+  return data[username]?.language || globalValue;
 };
 
 export const setLanguage = (language) => {
   const data = getData();
   const username = getCurrentUser();
+  localStorage.setItem(GLOBAL_LANGUAGE_KEY, language);
   if (!username) {
-    localStorage.setItem(GLOBAL_LANGUAGE_KEY, language);
     return;
   }
 
@@ -418,17 +425,18 @@ export const setLanguage = (language) => {
 export const getUiTheme = () => {
   const data = getData();
   const username = getCurrentUser();
+  const globalValue = getGlobalPreference(GLOBAL_UI_THEME_KEY, 'dark');
   if (!username) {
-    return localStorage.getItem(GLOBAL_UI_THEME_KEY) || 'dark';
+    return globalValue;
   }
-  return data[username]?.uiTheme || 'dark';
+  return data[username]?.uiTheme || globalValue;
 };
 
 export const setUiTheme = (theme) => {
   const data = getData();
   const username = getCurrentUser();
+  localStorage.setItem(GLOBAL_UI_THEME_KEY, theme);
   if (!username) {
-    localStorage.setItem(GLOBAL_UI_THEME_KEY, theme);
     return;
   }
 
@@ -440,17 +448,18 @@ export const setUiTheme = (theme) => {
 export const getBackgroundPalette = () => {
   const data = getData();
   const username = getCurrentUser();
+  const globalValue = getGlobalPreference(GLOBAL_BG_PALETTE_KEY, 'calm');
   if (!username) {
-    return localStorage.getItem(GLOBAL_BG_PALETTE_KEY) || 'calm';
+    return globalValue;
   }
-  return data[username]?.bgPalette || 'calm';
+  return data[username]?.bgPalette || globalValue;
 };
 
 export const setBackgroundPalette = (palette) => {
   const data = getData();
   const username = getCurrentUser();
+  localStorage.setItem(GLOBAL_BG_PALETTE_KEY, palette);
   if (!username) {
-    localStorage.setItem(GLOBAL_BG_PALETTE_KEY, palette);
     return;
   }
 
@@ -462,17 +471,18 @@ export const setBackgroundPalette = (palette) => {
 export const getBackgroundMusic = () => {
   const data = getData();
   const username = getCurrentUser();
+  const globalValue = getGlobalPreference(GLOBAL_BG_MUSIC_KEY, 'off');
   if (!username) {
-    return localStorage.getItem(GLOBAL_BG_MUSIC_KEY) || 'off';
+    return globalValue;
   }
-  return data[username]?.bgMusic || 'off';
+  return data[username]?.bgMusic || globalValue;
 };
 
 export const setBackgroundMusic = (musicId) => {
   const data = getData();
   const username = getCurrentUser();
+  localStorage.setItem(GLOBAL_BG_MUSIC_KEY, musicId);
   if (!username) {
-    localStorage.setItem(GLOBAL_BG_MUSIC_KEY, musicId);
     return;
   }
 
@@ -630,8 +640,11 @@ export const saveTaskFeedback = (feedbackData) => {
       conversation.taskCompleted = true;
       conversation.taskStatus = 'completed';
       conversation.taskMovedToTracker = true;
+      conversation.feedback = feedbackData.feedback;
       conversation.taskFeedback = feedbackData.feedback;
       conversation.moodChange = feedbackData.moodChange;
+      if (feedbackData.resultStatus) conversation.resultStatus = feedbackData.resultStatus;
+      if (feedbackData.afterEmotionId) conversation.afterEmotionId = feedbackData.afterEmotionId;
     }
   }
 

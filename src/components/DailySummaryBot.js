@@ -2,19 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Calendar } from 'lucide-react';
 import { EMOTIONS } from '../constants/emotions';
 import { getDailySummary, getDominantEmotion } from '../utils/storage';
-import { getGuidedRecommendation, getSupportiveMessageByEmotion, getBotClosingMessage } from '../constants/botRecommendations';
-import { saveBotConversation, getLanguage } from '../utils/storage';
+import {
+  getProfessionalBotReply,
+  getBotIntroText,
+  getBotQuestionText,
+  getContextualReflectionText,
+  buildAdaptiveQuestionPlan,
+  getBotClosingMessageShort
+} from '../constants/botRecommendations';
+import { saveBotConversation, getLanguage, getUiTheme } from '../utils/storage';
 import { isRtlLanguage } from '../constants/i18n';
-
-const BOT_EXPLANATION_DAILY = `אני כאן כדי לעזור לך להבין את הרגשות שלך טוב יותר! 💙
-
-אני אשאל אותך על היום שלך, ואתה תענה לי בכנות.
-לפי התשובה שלך אני אתן לך המלצה או משימה שיכולה לעזור לך.
-
-השיחה נשמרת - תוכל לראות את כל ההמלצות בסיכום היומי.`;
-const BOT_EXPLANATION_DAILY_EN = `I am here to help you reflect on your day and emotions. 💙
-I will ask 3 quick questions and suggest one focused task you can act on.
-This chat is saved to your daily summary so you can track progress.`;
 
 const DailySummaryBot = ({ onClose }) => {
   const [messages, setMessages] = useState([]);
@@ -22,11 +19,21 @@ const DailySummaryBot = ({ onClose }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [conversationPhase, setConversationPhase] = useState('intro');
   const [questionIndex, setQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState({ sleepHours: null, hardThing: '', helpNow: '' });
+  const [answers, setAnswers] = useState({
+    mainThing: '',
+    context: '',
+    sleepHours: null,
+    energyLevel: null,
+    stressLevel: null,
+    helpNow: ''
+  });
+  const [questionFlow, setQuestionFlow] = useState([]);
   const messagesEndRef = useRef(null);
   const timeoutsRef = useRef([]);
   const isSendingRef = useRef(false);
   const language = getLanguage();
+  const uiTheme = getUiTheme();
+  const isLight = uiTheme === 'light';
   const isRtl = isRtlLanguage(language);
 
   const queueTimeout = (callback, delay) => {
@@ -52,27 +59,30 @@ const DailySummaryBot = ({ onClose }) => {
     }
 
     const emotion = EMOTIONS[dominantEmotion];
-    const introMessage = {
-      type: 'bot',
-      text: language === 'en'
-        ? `Hi! 👋 You logged ${totalEmotions} emotions today, and your dominant emotion was ${emotion.emoji} ${emotion.nameEn || emotion.name}.\n\n${BOT_EXPLANATION_DAILY_EN}`
-        : `שלום! 👋 היום סימנת ${totalEmotions} רגשות, והרגש הדומיננטי שלך היה ${emotion.emoji} ${emotion.name}.\n\n${BOT_EXPLANATION_DAILY}`
-    };
-    setMessages([introMessage]);
-    setAnswers({ sleepHours: null, hardThing: '', helpNow: '' });
+    const emotionLabel = language === 'en'
+      ? `${emotion.emoji} ${emotion.nameEn || emotion.name}`
+      : `${emotion.emoji} ${emotion.name}`;
+    setMessages([{ type: 'bot', text: getBotIntroText({ emotionLabel, language, mode: 'daily' }) }]);
+    setAnswers({
+      mainThing: '',
+      context: '',
+      sleepHours: null,
+      energyLevel: null,
+      stressLevel: null,
+      helpNow: ''
+    });
     setQuestionIndex(0);
 
+    const guidedQuestions = [{ id: 'mainThing', text: getBotQuestionText({ questionId: 'mainThing', emotionName: emotionLabel, language }) }];
+    setQuestionFlow(guidedQuestions);
     queueTimeout(() => {
       setIsTyping(true);
       queueTimeout(() => {
-        const question = language === 'en'
-          ? 'About how many hours did you sleep last night?'
-          : 'כמה שעות ישנת בערך בלילה האחרון?';
-        setMessages(prev => [...prev, { type: 'bot', text: question }]);
+        setMessages(prev => [...prev, { type: 'bot', text: guidedQuestions[0]?.text }]);
         setIsTyping(false);
         setConversationPhase('waiting_answer');
       }, 1200);
-    }, 2000);
+    }, 700);
 
     return () => {
       timeoutsRef.current.forEach(clearTimeout);
@@ -93,44 +103,80 @@ const DailySummaryBot = ({ onClose }) => {
     setInputValue('');
     setMessages(prev => [...prev, { type: 'user', text: answer }]);
 
-    const questionIds = ['sleepHours', 'hardThing', 'helpNow'];
-    const currentId = questionIds[questionIndex] || 'hardThing';
+    const dominantEmotion = getDominantEmotion();
+    const emotion = EMOTIONS[dominantEmotion];
+    const guidedQuestions = questionFlow.length
+      ? questionFlow
+      : [{ id: 'mainThing', text: getBotQuestionText({ questionId: 'mainThing', emotionName: '', language }) }];
+    const currentId = guidedQuestions[questionIndex]?.id || 'mainThing';
 
     setAnswers((prev) => {
       if (currentId === 'sleepHours') {
         const maybeNumber = Number(String(answer).replace(',', '.').trim());
         return { ...prev, sleepHours: Number.isFinite(maybeNumber) ? maybeNumber : prev.sleepHours };
       }
-      if (currentId === 'hardThing') return { ...prev, hardThing: answer };
+      if (currentId === 'context') return { ...prev, context: answer };
+      if (currentId === 'energyLevel') {
+        const maybeNumber = Number(String(answer).replace(',', '.').trim());
+        return { ...prev, energyLevel: Number.isFinite(maybeNumber) ? maybeNumber : prev.energyLevel };
+      }
+      if (currentId === 'stressLevel') {
+        const maybeNumber = Number(String(answer).replace(',', '.').trim());
+        return { ...prev, stressLevel: Number.isFinite(maybeNumber) ? maybeNumber : prev.stressLevel };
+      }
       if (currentId === 'helpNow') return { ...prev, helpNow: answer };
+      if (currentId === 'mainThing') return { ...prev, mainThing: answer };
       return prev;
     });
 
     const nextIndex = questionIndex + 1;
-    const hasMore = nextIndex < questionIds.length;
+    let nextFlow = null;
+    if (currentId === 'mainThing' && questionIndex === 0) {
+      const emotionLabel = language === 'en'
+        ? `${emotion?.emoji || ''} ${emotion?.nameEn || emotion?.name || ''}`.trim()
+        : `${emotion?.emoji || ''} ${emotion?.name || ''}`.trim();
+      const followUps = buildAdaptiveQuestionPlan({
+        emotionLabel,
+        emotionId: dominantEmotion,
+        language,
+        mode: 'daily',
+        mainThing: answer
+      });
+      const newFlow = [{ id: 'mainThing', text: guidedQuestions[0]?.text }, ...followUps];
+      nextFlow = newFlow;
+      setQuestionFlow(newFlow);
+    }
+
+    const effectiveFlow = nextFlow || (questionFlow.length ? questionFlow : guidedQuestions);
+
+    const hasMore = nextIndex < effectiveFlow.length;
 
     if (hasMore) {
       setQuestionIndex(nextIndex);
       setIsTyping(true);
       queueTimeout(() => {
-        const questionText = language === 'en'
-          ? [
-              'Was there something hard today that might explain this feeling?',
-              'What would help you most right now (even a small thing)?'
-            ][nextIndex - 1]
-          : [
-              'היה משהו קשה היום שיכול להסביר את הרגש הזה?',
-              'מה הכי היה יכול לעזור לך עכשיו (גם משהו קטן)?'
-            ][nextIndex - 1];
-        setMessages((prev) => [...prev, { type: 'bot', text: questionText }]);
-        setIsTyping(false);
-        isSendingRef.current = false;
+        const emotionName = language === 'en'
+          ? (EMOTIONS[dominantEmotion]?.nameEn || EMOTIONS[dominantEmotion]?.name || '')
+          : (EMOTIONS[dominantEmotion]?.name || '');
+        const reflection = getContextualReflectionText({
+          questionId: currentId,
+          answer,
+          emotionName,
+          language,
+          answers: { ...answers, ...(currentId === 'mainThing' ? { mainThing: answer } : {}) }
+        });
+
+        setMessages((prev) => [...prev, { type: 'bot', text: reflection }]);
+        queueTimeout(() => {
+          setMessages((prev) => [...prev, { type: 'bot', text: effectiveFlow[nextIndex]?.text }]);
+          setIsTyping(false);
+          isSendingRef.current = false;
+        }, 650);
       }, 900);
       return;
     }
 
     setConversationPhase('recommendation');
-    const dominantEmotion = getDominantEmotion();
     const emotionId = dominantEmotion || 'sad';
     setIsTyping(true);
 
@@ -138,22 +184,35 @@ const DailySummaryBot = ({ onClose }) => {
       const mergedAnswers = {
         ...answers,
         ...(currentId === 'sleepHours' ? { sleepHours: Number(String(answer).replace(',', '.').trim()) } : {}),
-        ...(currentId === 'hardThing' ? { hardThing: answer } : {}),
-        ...(currentId === 'helpNow' ? { helpNow: answer } : {})
+        ...(currentId === 'context' ? { context: answer } : {}),
+        ...(currentId === 'energyLevel' ? { energyLevel: Number(String(answer).replace(',', '.').trim()) } : {}),
+        ...(currentId === 'stressLevel' ? { stressLevel: Number(String(answer).replace(',', '.').trim()) } : {}),
+        ...(currentId === 'helpNow' ? { helpNow: answer } : {}),
+        ...(currentId === 'mainThing' ? { mainThing: answer } : {})
       };
 
-      const rec = getGuidedRecommendation(emotionId, mergedAnswers, { mode: 'daily', language });
-      const supportiveMessage = getSupportiveMessageByEmotion(emotionId, language);
+      const emotionObj = EMOTIONS[emotionId];
+      const emotionName = language === 'en'
+        ? (emotionObj?.nameEn || emotionObj?.name || 'General')
+        : (emotionObj?.name || 'כללי');
+
+      const reply = getProfessionalBotReply({
+        emotionId,
+        emotionName,
+        language,
+        answers: mergedAnswers,
+        mode: 'daily'
+      });
       setMessages(prev => [...prev, { 
         type: 'bot', 
-        text: `${rec.text}\n\n${supportiveMessage}` 
+        text: reply.text
       }]);
       setIsTyping(false);
 
       queueTimeout(() => {
         setIsTyping(true);
         queueTimeout(() => {
-          setMessages(prev => [...prev, { type: 'bot', text: getBotClosingMessage(language) }]);
+          setMessages(prev => [...prev, { type: 'bot', text: getBotClosingMessageShort(language) }]);
           setIsTyping(false);
           setConversationPhase('summary');
           isSendingRef.current = false;
@@ -163,18 +222,21 @@ const DailySummaryBot = ({ onClose }) => {
             emotionName: language === 'en' 
               ? (EMOTIONS[dominantEmotion]?.nameEn || EMOTIONS[dominantEmotion]?.name || 'General')
               : (EMOTIONS[dominantEmotion]?.name || 'כללי'),
-            userAnswer: mergedAnswers.hardThing || mergedAnswers.helpNow || '',
+            userAnswer: mergedAnswers.mainThing || mergedAnswers.helpNow || '',
             sleepHours: mergedAnswers.sleepHours ?? null,
-            hardThing: mergedAnswers.hardThing || '',
+            mainThing: mergedAnswers.mainThing || '',
+            context: mergedAnswers.context || '',
+            energyLevel: mergedAnswers.energyLevel ?? null,
+            stressLevel: mergedAnswers.stressLevel ?? null,
             helpNow: mergedAnswers.helpNow || '',
-            recommendation: rec.text,
-            task: rec.task,
+            recommendation: reply.text,
+            task: reply.task,
             timestamp: new Date().toISOString(),
             type: 'daily_summary'
           });
-        }, 1000);
-      }, 2000);
-    }, 1500);
+        }, 700);
+      }, 700);
+    }, 900);
   };
 
   const handleKeyPress = (e) => {
@@ -185,8 +247,14 @@ const DailySummaryBot = ({ onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn">
-      <div className="bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl h-[650px] flex flex-col border border-indigo-400/30">
+    <div
+      className={`fixed inset-0 ${isLight ? 'bg-slate-950/35' : 'bg-black/70'} backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn`}
+    >
+      <div
+        className={`rounded-3xl shadow-2xl w-full max-w-2xl h-[650px] flex flex-col border ${
+          isLight ? 'bg-white/95 border-slate-200' : 'bg-slate-900 border-indigo-400/30'
+        }`}
+      >
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 rounded-t-3xl flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
@@ -206,18 +274,24 @@ const DailySummaryBot = ({ onClose }) => {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-b from-slate-900 to-slate-950">
+        <div
+          className={`flex-1 overflow-y-auto p-6 space-y-4 ${
+            isLight ? 'bg-gradient-to-b from-white to-slate-50' : 'bg-gradient-to-b from-slate-900 to-slate-950'
+          }`}
+        >
           {messages.map((msg, index) => (
             <div key={index} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'} animate-slideUp`}>
               <div className={`max-w-[85%] rounded-2xl p-4 ${
                 msg.type === 'user'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                  : 'bg-slate-800 border border-slate-700 text-slate-100 shadow-md'
+                  : isLight
+                    ? 'bg-white/95 border border-slate-200 text-slate-800 shadow-md'
+                    : 'bg-slate-800 border border-slate-700 text-slate-100 shadow-md'
               }`}>
                 {msg.type === 'bot' && (
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className="w-4 h-4 text-indigo-300" />
-                    <span className="text-xs font-semibold text-indigo-200">{language === 'en' ? 'Mood Bot' : 'בוט מצב רוח'}</span>
+                    <Sparkles className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-indigo-300'}`} />
+                    <span className={`text-xs font-semibold ${isLight ? 'text-indigo-700' : 'text-indigo-200'}`}>{language === 'en' ? 'Mood Bot' : 'בוט מצב רוח'}</span>
                   </div>
                 )}
                 <p className={`${isRtl ? 'text-right' : 'text-left'} whitespace-pre-wrap leading-relaxed`}>{msg.text}</p>
@@ -227,14 +301,14 @@ const DailySummaryBot = ({ onClose }) => {
 
           {isTyping && (
             <div className="flex justify-start animate-slideUp">
-              <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 shadow-md">
+              <div className={`rounded-2xl p-4 shadow-md border ${isLight ? 'bg-white/95 border-slate-200' : 'bg-slate-800 border-slate-700'}`}>
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                    <div className={`w-2 h-2 rounded-full animate-bounce ${isLight ? 'bg-slate-500' : 'bg-gray-400'}`} style={{ animationDelay: '0s' }}></div>
+                    <div className={`w-2 h-2 rounded-full animate-bounce ${isLight ? 'bg-slate-500' : 'bg-gray-400'}`} style={{ animationDelay: '0.2s' }}></div>
+                    <div className={`w-2 h-2 rounded-full animate-bounce ${isLight ? 'bg-slate-500' : 'bg-gray-400'}`} style={{ animationDelay: '0.4s' }}></div>
                   </div>
-                  <span className="text-sm text-slate-400">{language === 'en' ? 'Typing...' : 'כותב...'}</span>
+                  <span className={`text-sm ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{language === 'en' ? 'Typing...' : 'כותב...'}</span>
                 </div>
               </div>
             </div>
@@ -242,7 +316,7 @@ const DailySummaryBot = ({ onClose }) => {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-6 border-t border-slate-700 bg-slate-900 rounded-b-3xl">
+        <div className={`p-6 border-t rounded-b-3xl ${isLight ? 'border-slate-200 bg-white/90' : 'border-slate-700 bg-slate-900'}`}>
           {conversationPhase === 'waiting_answer' && (
             <div className="flex gap-3">
               <input
@@ -251,7 +325,11 @@ const DailySummaryBot = ({ onClose }) => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder={language === 'en' ? 'Type your answer...' : 'כתוב את התשובה שלך...'}
-                className="flex-1 px-4 py-3 border border-slate-600 bg-slate-800 text-slate-100 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                className={`flex-1 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-500 placeholder:opacity-100 ${
+                  isLight
+                    ? 'border-slate-300 bg-white text-slate-900'
+                    : 'border-slate-600 bg-slate-800 text-slate-100'
+                }`}
                 dir={isRtl ? 'rtl' : 'ltr'}
               />
               <button

@@ -1,7 +1,6 @@
 export const TEXTS = {
   he: {
     moodly: 'Moodly',
-    chooseAction: 'בחרי מה תרצי לעשות',
     moodJar: 'צנצנת רגשות',
     viewCharts: 'צפייה בגרפים',
     settings: 'הגדרות',
@@ -71,7 +70,6 @@ export const TEXTS = {
   },
   en: {
     moodly: 'Moodly',
-    chooseAction: 'Choose what you want to do',
     moodJar: 'Emotion Jar',
     viewCharts: 'View Charts',
     settings: 'Settings',

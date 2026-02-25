@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { EMOTIONS, EMOTION_IDS } from '../constants/emotions';
 import { getAuthSession, getCurrentClassWeeklyData, getLanguage, getWeeklyData, getTodayDate, getUiTheme } from '../utils/storage';
 import { getSchoolName } from '../constants/schools';
 import { translate as t } from '../constants/i18n';
 
-const ChartsScreen = ({ onBack: _onBack, onBackToLogin }) => {
+const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
   const language = getLanguage();
   const uiTheme = getUiTheme();
   const isDark = uiTheme === 'dark';
@@ -69,21 +69,6 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin }) => {
               : 'bg-white/90 border-slate-400 shadow-[0_28px_70px_rgba(15,23,42,0.22)] ring-1 ring-slate-300/70'
           }`}
         >
-          {isGeneral && onBackToLogin && (
-            <div className={`mb-4 flex ${isRtl ? 'justify-end' : 'justify-start'}`}>
-              <button
-                onClick={onBackToLogin}
-                className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl border text-sm font-semibold transition-all ${
-                  isDark
-                    ? 'border-slate-700 bg-slate-800/70 text-slate-100 hover:bg-slate-800'
-                    : 'border-slate-200 bg-slate-50 text-slate-800 hover:bg-slate-100'
-                }`}
-              >
-                <ArrowLeft className={`w-4 h-4 ${isRtl ? 'rotate-180' : ''}`} />
-              </button>
-            </div>
-          )}
-
           {isGeneral && authSession?.schoolId && authSession?.classId && (
             <div className={`mb-4 text-sm ${isDark ? 'text-cyan-200' : 'text-cyan-800'}`}>
               {language === 'en'
@@ -91,7 +76,7 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin }) => {
                 : `מבט כיתתי: ${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`}
             </div>
           )}
-          <div className={`flex flex-wrap items-center gap-3 mb-5 ${isRtl ? 'justify-end' : 'justify-start'}`}>
+          <div dir="ltr" className={`flex flex-wrap items-center gap-3 mb-5 ${isRtl ? 'justify-end' : 'justify-start'}`}>
             <div className={`rounded-full border p-1 flex ${isDark ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-slate-100'}`}>
               <button
                 onClick={() => setViewMode('daily')}
@@ -217,7 +202,12 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin }) => {
           )}
 
           <div className={`border-t pt-4 mt-3 ${isDark ? 'border-slate-700' : 'border-slate-200'}`}>
-            <h3 className={`text-xl font-bold mb-3 ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>{t(language, 'moodHistory')}</h3>
+            <div dir={isRtl ? 'rtl' : 'ltr'} className="mb-3 flex items-center gap-2 justify-start">
+              <Sparkles className={`w-5 h-5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`} />
+              <h3 className={`text-xl font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                {t(language, 'moodHistory')}
+              </h3>
+            </div>
             <div className="flex flex-wrap gap-2">
               {EMOTION_IDS.map((emotionId) => {
                 const emotion = EMOTIONS[emotionId];
