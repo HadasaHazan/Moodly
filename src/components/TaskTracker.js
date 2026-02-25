@@ -222,7 +222,7 @@ const TaskTracker = ({ onClose, isModal = true }) => {
 
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 flex items-center justify-between">
         <h2 className="text-2xl font-bold">{language === 'en' ? 'Task Tracker' : 'מעקב משימות'}</h2>
-        {isModal && onClose && (
+        {onClose && (
           <button
             onClick={onClose}
             className="text-white hover:text-gray-200 transition-colors"
@@ -327,7 +327,7 @@ const TaskTracker = ({ onClose, isModal = true }) => {
 	                                aria-label={isExpanded ? (language === 'en' ? 'Collapse task' : 'הסתר משימה') : (language === 'en' ? 'Expand task' : 'הרחב משימה')}
 	                                type="button"
 	                              >
-	                                {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+	                                {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
 	                              </button>
 	                            </div>
 

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { BarChart3, Sparkles } from 'lucide-react';
 import { EMOTIONS, EMOTION_IDS } from '../constants/emotions';
 import { getAuthSession, getCurrentClassWeeklyData, getLanguage, getWeeklyData, getTodayDate, getUiTheme } from '../utils/storage';
 import { getSchoolName } from '../constants/schools';
@@ -63,35 +63,50 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
         {/* כפתור חזרה - מוסר כי יש ניווט קבוע */}
 
         <div
-          className={`max-w-3xl mx-auto rounded-[30px] border p-5 backdrop-blur-sm ${
+          className={`max-w-3xl mx-auto rounded-3xl border overflow-hidden backdrop-blur-sm ${
             isDark
               ? 'bg-gradient-to-br from-slate-950/80 via-slate-900/90 to-slate-950/70 border-slate-600 shadow-[0_34px_90px_rgba(0,0,0,0.55)] ring-1 ring-white/10'
               : 'bg-white/90 border-slate-400 shadow-[0_28px_70px_rgba(15,23,42,0.22)] ring-1 ring-slate-300/70'
           }`}
         >
-          {isGeneral && authSession?.schoolId && authSession?.classId && (
-            <div className={`mb-4 text-sm ${isDark ? 'text-cyan-200' : 'text-cyan-800'}`}>
-              {language === 'en'
-                ? `Class Overview: ${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`
-                : `מבט כיתתי: ${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`}
-            </div>
-          )}
-          <div dir="ltr" className={`flex flex-wrap items-center gap-3 mb-5 ${isRtl ? 'justify-end' : 'justify-start'}`}>
-            <div className={`rounded-full border p-1 flex ${isDark ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-slate-100'}`}>
-              <button
-                onClick={() => setViewMode('daily')}
-                className={`px-3 py-1 text-xs rounded-full font-semibold ${viewMode === 'daily' ? 'bg-indigo-600 text-white' : (isDark ? 'text-slate-300' : 'text-slate-700')}`}
-              >
-                {t(language, 'dailySummary')}
-              </button>
-              <button
-                onClick={() => setViewMode('weekly')}
-                className={`px-3 py-1 text-xs rounded-full font-semibold ${viewMode === 'weekly' ? 'bg-indigo-600 text-white' : (isDark ? 'text-slate-300' : 'text-slate-700')}`}
-              >
-                {t(language, 'weeklySummary')}
-              </button>
+          <div
+            dir={isRtl ? 'rtl' : 'ltr'}
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 flex items-center justify-between gap-3"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
+                <BarChart3 className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">{t(language, 'chartsAndSummary')}</h2>
+                {isGeneral && authSession?.schoolId && authSession?.classId && (
+                  <p className="text-sm text-indigo-100">
+                    {language === 'en'
+                      ? `${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`
+                      : `${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
+
+          <div className="p-5">
+            <div dir="ltr" className={`flex flex-wrap items-center gap-3 mb-5 ${isRtl ? 'justify-end' : 'justify-start'}`}>
+              <div className={`rounded-full border p-1 flex ${isDark ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-slate-100'}`}>
+                <button
+                  onClick={() => setViewMode('daily')}
+                  className={`px-3 py-1 text-xs rounded-full font-semibold ${viewMode === 'daily' ? 'bg-indigo-600 text-white' : (isDark ? 'text-slate-300' : 'text-slate-700')}`}
+                >
+                  {t(language, 'dailySummary')}
+                </button>
+                <button
+                  onClick={() => setViewMode('weekly')}
+                  className={`px-3 py-1 text-xs rounded-full font-semibold ${viewMode === 'weekly' ? 'bg-indigo-600 text-white' : (isDark ? 'text-slate-300' : 'text-slate-700')}`}
+                >
+                  {t(language, 'weeklySummary')}
+                </button>
+              </div>
+            </div>
 
           {viewMode === 'weekly' ? (
             <div className="grid grid-cols-7 gap-1 mb-4" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -233,6 +248,7 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
                 );
               })}
             </div>
+          </div>
           </div>
         </div>
 
