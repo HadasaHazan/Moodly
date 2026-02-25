@@ -51,9 +51,11 @@ const TEXTS = {
 };
 
 const getDeviceId = () => {
-  const key = 'moodBottleDeviceId';
+  const key = 'moodlyDeviceId';
   const existing = localStorage.getItem(key);
-  if (existing) return existing;
+  if (existing) {
+    return existing;
+  }
   const value = Math.random().toString(36).slice(2, 10);
   localStorage.setItem(key, value);
   return value;

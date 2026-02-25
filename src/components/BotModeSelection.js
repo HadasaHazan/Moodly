@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Sparkles, MessageCircle, Calendar } from 'lucide-react';
+import { Bot, MessageCircle, Calendar } from 'lucide-react';
 import { setBotMode } from '../utils/storage';
 import { translate as t, isRtlLanguage } from '../constants/i18n';
 import { getLanguage } from '../utils/storage';

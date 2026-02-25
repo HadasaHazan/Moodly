@@ -1,7 +1,6 @@
 // ניהול שמירת נתונים ב-localStorage
 
 const APP_STORAGE_PREFIX = 'moodly';
-const LEGACY_STORAGE_PREFIX = 'mood' + 'Bottle';
 
 const STORAGE_KEY = `${APP_STORAGE_PREFIX}Data`;
 const CURRENT_USER_KEY = `${APP_STORAGE_PREFIX}CurrentUser`;
@@ -13,43 +12,6 @@ const GLOBAL_BG_PALETTE_KEY = `${APP_STORAGE_PREFIX}GlobalBgPalette`;
 const GLOBAL_UI_THEME_KEY = `${APP_STORAGE_PREFIX}GlobalUiTheme`;
 const GLOBAL_BG_MUSIC_KEY = `${APP_STORAGE_PREFIX}GlobalBgMusic`;
 const GLOBAL_BOT_MODE_KEY = `${APP_STORAGE_PREFIX}GlobalBotMode`;
-
-const LEGACY_STORAGE_KEY = `${LEGACY_STORAGE_PREFIX}Data`;
-const LEGACY_CURRENT_USER_KEY = `${LEGACY_STORAGE_PREFIX}CurrentUser`;
-const LEGACY_AUTH_SESSION_KEY = `${LEGACY_STORAGE_PREFIX}AuthSession`;
-const LEGACY_USER_CONTEXTS_KEY = `${LEGACY_STORAGE_PREFIX}UserContexts`;
-const LEGACY_CLASS_AGGREGATES_KEY = `${LEGACY_STORAGE_PREFIX}ClassAggregates`;
-const LEGACY_GLOBAL_LANGUAGE_KEY = `${LEGACY_STORAGE_PREFIX}GlobalLanguage`;
-const LEGACY_GLOBAL_BG_PALETTE_KEY = `${LEGACY_STORAGE_PREFIX}GlobalBgPalette`;
-const LEGACY_GLOBAL_UI_THEME_KEY = `${LEGACY_STORAGE_PREFIX}GlobalUiTheme`;
-const LEGACY_GLOBAL_BG_MUSIC_KEY = `${LEGACY_STORAGE_PREFIX}GlobalBgMusic`;
-const LEGACY_GLOBAL_BOT_MODE_KEY = `${LEGACY_STORAGE_PREFIX}GlobalBotMode`;
-
-const getItemWithLegacy = (key, legacyKey) => {
-  const value = localStorage.getItem(key);
-  if (value !== null) return { value, fromLegacy: false };
-  if (!legacyKey) return { value: null, fromLegacy: false };
-  const legacyValue = localStorage.getItem(legacyKey);
-  if (legacyValue !== null) return { value: legacyValue, fromLegacy: true };
-  return { value: null, fromLegacy: false };
-};
-
-const migrateLegacyItem = (key, legacyKey, rawValue) => {
-  if (!legacyKey) return;
-  if (rawValue === null) return;
-  if (localStorage.getItem(key) !== null) return;
-  if (localStorage.getItem(legacyKey) === null) return;
-  try {
-    localStorage.setItem(key, rawValue);
-  } catch (error) {
-    console.error('Error migrating localStorage key:', error);
-  }
-};
-
-const removeItemBoth = (key, legacyKey) => {
-  localStorage.removeItem(key);
-  if (legacyKey) localStorage.removeItem(legacyKey);
-};
 
 const formatLocalDate = (date) => {
   const year = date.getFullYear();
@@ -109,8 +71,8 @@ export const getWeekStartDate = () => {
 // קבלת כל הנתונים
 export const getData = () => {
   try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : {};
+    const value = localStorage.getItem(STORAGE_KEY);
+    return value ? JSON.parse(value) : {};
   } catch (error) {
     console.error('Error reading from localStorage:', error);
     return {};
@@ -130,8 +92,7 @@ export const saveData = (data) => {
 
 // קבלת המשתמש הנוכחי
 export const getCurrentUser = () => {
-  const storedUser = localStorage.getItem(CURRENT_USER_KEY);
-  return storedUser || null;
+  return localStorage.getItem(CURRENT_USER_KEY) || null;
 };
 
 // הגדרת המשתמש הנוכחי
@@ -145,8 +106,8 @@ export const setCurrentUser = (username) => {
 
 export const getAuthSession = () => {
   try {
-    const raw = localStorage.getItem(AUTH_SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const value = localStorage.getItem(AUTH_SESSION_KEY);
+    return value ? JSON.parse(value) : null;
   } catch (error) {
     console.error('Error reading auth session:', error);
     return null;
@@ -185,8 +146,8 @@ export const logout = () => {
 
 const getUserContexts = () => {
   try {
-    const raw = localStorage.getItem(USER_CONTEXTS_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const value = localStorage.getItem(USER_CONTEXTS_KEY);
+    return value ? JSON.parse(value) : {};
   } catch (error) {
     console.error('Error reading user contexts:', error);
     return {};
@@ -205,8 +166,8 @@ const saveUserContexts = (contexts) => {
 
 const getClassAggregates = () => {
   try {
-    const raw = localStorage.getItem(CLASS_AGGREGATES_KEY);
-    return raw ? JSON.parse(raw) : {};
+    const value = localStorage.getItem(CLASS_AGGREGATES_KEY);
+    return value ? JSON.parse(value) : {};
   } catch (error) {
     console.error('Error reading class aggregates:', error);
     return {};
@@ -410,7 +371,9 @@ export const getWeeklyData = () => {
 export const getBotMode = () => {
   const data = getData();
   const username = getCurrentUser();
-  if (!username) return localStorage.getItem(GLOBAL_BOT_MODE_KEY) || 'immediate';
+  if (!username) {
+    return localStorage.getItem(GLOBAL_BOT_MODE_KEY) || 'immediate';
+  }
   return data[username]?.botMode || 'immediate';
 };
 
@@ -433,7 +396,9 @@ export const setBotMode = (mode) => {
 export const getLanguage = () => {
   const data = getData();
   const username = getCurrentUser();
-  if (!username) return localStorage.getItem(GLOBAL_LANGUAGE_KEY) || 'he';
+  if (!username) {
+    return localStorage.getItem(GLOBAL_LANGUAGE_KEY) || 'he';
+  }
   return data[username]?.language || 'he';
 };
 
@@ -453,7 +418,9 @@ export const setLanguage = (language) => {
 export const getUiTheme = () => {
   const data = getData();
   const username = getCurrentUser();
-  if (!username) return localStorage.getItem(GLOBAL_UI_THEME_KEY) || 'dark';
+  if (!username) {
+    return localStorage.getItem(GLOBAL_UI_THEME_KEY) || 'dark';
+  }
   return data[username]?.uiTheme || 'dark';
 };
 
@@ -473,7 +440,9 @@ export const setUiTheme = (theme) => {
 export const getBackgroundPalette = () => {
   const data = getData();
   const username = getCurrentUser();
-  if (!username) return localStorage.getItem(GLOBAL_BG_PALETTE_KEY) || 'calm';
+  if (!username) {
+    return localStorage.getItem(GLOBAL_BG_PALETTE_KEY) || 'calm';
+  }
   return data[username]?.bgPalette || 'calm';
 };
 
@@ -493,7 +462,9 @@ export const setBackgroundPalette = (palette) => {
 export const getBackgroundMusic = () => {
   const data = getData();
   const username = getCurrentUser();
-  if (!username) return localStorage.getItem(GLOBAL_BG_MUSIC_KEY) || 'off';
+  if (!username) {
+    return localStorage.getItem(GLOBAL_BG_MUSIC_KEY) || 'off';
+  }
   return data[username]?.bgMusic || 'off';
 };
 
