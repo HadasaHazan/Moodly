@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, X, Clock3, ListTodo, ChevronDown, ChevronUp } from 'lucide-react';
 import { getBotDailySummary, saveTaskFeedback, updateBotConversationTask } from '../utils/storage';
 import { EMOTIONS } from '../constants/emotions';
@@ -45,7 +45,7 @@ const TaskTracker = ({ onClose, isModal = true }) => {
   const isLight = uiTheme === 'light';
   const isRtl = isRtlLanguage(language);
 
-  const loadTasks = () => {
+  const loadTasks = useCallback(() => {
     const conversations = getBotDailySummary();
     const todayTasks = conversations
       .map((conv) => {
@@ -76,11 +76,11 @@ const TaskTracker = ({ onClose, isModal = true }) => {
       .filter(Boolean)
       .sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
     setTasks(todayTasks);
-  };
+  }, [language]);
 
   useEffect(() => {
     loadTasks();
-  }, []);
+  }, [loadTasks]);
 
   useEffect(() => {
     if (!selectedTask || !completionFormRef.current) return;

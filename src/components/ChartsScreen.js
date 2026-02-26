@@ -68,7 +68,7 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
   const patternInsights = useMemo(() => (isGeneral ? { negativeFrequent: [], weekdayRecurring: [] } : getEmotionPatternInsights()), [isGeneral]);
   const classParticipantStats = useMemo(
     () => (isGeneral ? getCurrentClassWeeklyParticipantStats() : { weeklyUnique: 0, todayUnique: 0, byDate: {} }),
-    [isGeneral, weeklyData]
+    [isGeneral]
   );
   const weekdayLabel = (weekday) => {
     const base = new Date('2026-02-22');
