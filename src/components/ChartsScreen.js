@@ -163,7 +163,7 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
               <div className={`mb-3 text-sm font-semibold ${isDark ? 'text-cyan-200' : 'text-slate-700'} ${isRtl ? 'text-right' : 'text-left'}`}>
                 {language === 'en'
                   ? `Daily summary is based on ${classParticipantStats.todayUnique} unique students.`
-                  : `הסיכום היומי מבוסס על ${classParticipantStats.todayUnique} תלמידים ייחודיים.`}
+                  : `הסיכום היומי מבוסס על ${classParticipantStats.todayUnique} תלמידים.`}
               </div>
             )}
 
