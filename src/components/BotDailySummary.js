@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MessageCircle, ChevronDown, ChevronUp, CheckCircle, Lightbulb } from 'lucide-react';
 import { EMOTIONS } from '../constants/emotions';
 import { getBotDailySummary, updateBotConversationTask, getLanguage, getUiTheme } from '../utils/storage';
+import { getConversationTaskText } from '../utils/botTasks';
 import { isRtlLanguage } from '../constants/i18n';
 
 const TASK_STATUS_LABEL = {
@@ -85,7 +86,7 @@ const BotDailySummary = ({ onOpenBot }) => {
   const isConversationInSection = (conv, sectionKey) => {
     const status = conv.taskStatus || 'pending';
     if (status !== sectionKey) return false;
-    if (!conv.task) return false;
+    if (!getConversationTaskText(conv, language)) return false;
     if (sectionKey === 'completed' && conv.taskMovedToTracker) return false;
     return true;
   };
@@ -219,7 +220,7 @@ const BotDailySummary = ({ onOpenBot }) => {
                                       <CheckCircle className={`w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5 ${isRtl ? '' : 'order-2'}`} />
                                       <div className={isRtl ? '' : 'text-right'}>
                                         <p className="font-bold text-emerald-300 text-sm mb-1">{language === 'en' ? 'Suggested task:' : 'משימה שהבוט הציע:'}</p>
-                                        <p className="text-emerald-100 text-sm">{conv.task}</p>
+                                        <p className="text-emerald-100 text-sm">{getConversationTaskText(conv, language)}</p>
                                       </div>
                                     </div>
                                   </div>

@@ -1,7 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart3, Sparkles } from 'lucide-react';
 import { EMOTIONS, EMOTION_IDS } from '../constants/emotions';
-import { getAuthSession, getCurrentClassWeeklyData, getLanguage, getWeeklyData, getTodayDate, getUiTheme } from '../utils/storage';
+import {
+  getAuthSession,
+  getCurrentClassWeeklyData,
+  getCurrentClassWeeklyParticipantStats,
+  getLanguage,
+  getWeeklyData,
+  getTodayDate,
+  getUiTheme,
+  getEmotionPatternInsights
+} from '../utils/storage';
 import { getSchoolName } from '../constants/schools';
 import { translate as t } from '../constants/i18n';
 
@@ -56,6 +65,16 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
     () => Math.max(1, ...EMOTION_IDS.map((id) => todayEmotions[id] || 0)),
     [todayEmotions]
   );
+  const patternInsights = useMemo(() => (isGeneral ? { negativeFrequent: [], weekdayRecurring: [] } : getEmotionPatternInsights()), [isGeneral]);
+  const classParticipantStats = useMemo(
+    () => (isGeneral ? getCurrentClassWeeklyParticipantStats() : { weeklyUnique: 0, todayUnique: 0, byDate: {} }),
+    [isGeneral, weeklyData]
+  );
+  const weekdayLabel = (weekday) => {
+    const base = new Date('2026-02-22');
+    base.setDate(base.getDate() + Number(weekday || 0));
+    return base.toLocaleDateString(language === 'he' ? 'he-IL' : 'en-US', { weekday: 'long' });
+  };
 
   return (
     <div className="min-h-screen p-4">
@@ -80,17 +99,50 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
               <div>
                 <h2 className="text-2xl font-bold">{t(language, 'chartsAndSummary')}</h2>
                 {isGeneral && authSession?.schoolId && authSession?.classId && (
-                  <p className="text-sm text-indigo-100">
-                    {language === 'en'
-                      ? `${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`
-                      : `${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`}
-                  </p>
+                  <>
+                    <p className="text-sm text-indigo-100">
+                      {language === 'en'
+                        ? `${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`
+                        : `${getSchoolName(authSession.schoolId, language)} / ${authSession.classId}`}
+                    </p>
+                  </>
                 )}
               </div>
             </div>
           </div>
 
           <div className="p-5">
+            {!isGeneral && (patternInsights.negativeFrequent.length > 0 || patternInsights.weekdayRecurring.length > 0) && (
+              <div className={`mb-5 rounded-2xl border p-4 ${isDark ? 'bg-amber-950/25 border-amber-700/60' : 'bg-amber-50 border-amber-300'}`}>
+                <div className={`font-bold mb-2 ${isDark ? 'text-amber-200' : 'text-amber-900'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                  {language === 'en' ? 'Pattern Alerts' : 'התראות דפוסים'}
+                </div>
+                <div className="space-y-2">
+                  {patternInsights.negativeFrequent.slice(0, 2).map((item) => {
+                    const emotion = EMOTIONS[item.emotionId];
+                    if (!emotion) return null;
+                    return (
+                      <div key={`neg-${item.emotionId}`} className={`text-sm ${isDark ? 'text-amber-100' : 'text-amber-900'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                        {language === 'en'
+                          ? `${emotion.emoji} ${emotion.nameEn || emotion.name} is repeating (${item.daysCount} days).`
+                          : `${emotion.emoji} ${emotion.name} חוזר/ת הרבה (${item.daysCount} ימים).`}
+                      </div>
+                    );
+                  })}
+                  {patternInsights.weekdayRecurring.slice(0, 2).map((item) => {
+                    const emotion = EMOTIONS[item.emotionId];
+                    if (!emotion) return null;
+                    return (
+                      <div key={`weekday-${item.emotionId}-${item.weekday}`} className={`text-sm ${isDark ? 'text-amber-100' : 'text-amber-900'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                        {language === 'en'
+                          ? `${emotion.emoji} ${emotion.nameEn || emotion.name} appears often on ${weekdayLabel(item.weekday)}.`
+                          : `${emotion.emoji} ${emotion.name} מופיע/ה הרבה ביום ${weekdayLabel(item.weekday)}.`}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div dir="ltr" className={`flex flex-wrap items-center gap-3 mb-5 ${isRtl ? 'justify-end' : 'justify-start'}`}>
               <div className={`rounded-full border p-1 flex ${isDark ? 'border-slate-600 bg-slate-800' : 'border-slate-300 bg-slate-100'}`}>
                 <button
@@ -107,6 +159,13 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
                 </button>
               </div>
             </div>
+            {isGeneral && viewMode === 'daily' && (
+              <div className={`mb-3 text-sm font-semibold ${isDark ? 'text-cyan-200' : 'text-slate-700'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                {language === 'en'
+                  ? `Daily summary is based on ${classParticipantStats.todayUnique} unique students.`
+                  : `הסיכום היומי מבוסס על ${classParticipantStats.todayUnique} תלמידים ייחודיים.`}
+              </div>
+            )}
 
           {viewMode === 'weekly' ? (
             <div className="grid grid-cols-7 gap-1 mb-4" dir={isRtl ? 'rtl' : 'ltr'}>
@@ -162,6 +221,13 @@ const ChartsScreen = ({ onBack: _onBack, onBackToLogin: _onBackToLogin }) => {
                     <div className={`text-[11px] font-semibold ${day.isToday ? 'text-indigo-500' : (isDark ? 'text-slate-300' : 'text-slate-600')}`}>
                       {day.dayShort}
                     </div>
+                    {isGeneral && (
+                      <div className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {language === 'en'
+                          ? `${classParticipantStats.byDate[day.date] || 0} students`
+                          : `${classParticipantStats.byDate[day.date] || 0} תלמידים`}
+                      </div>
+                    )}
                   </div>
                 );
               })}

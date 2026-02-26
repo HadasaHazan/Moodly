@@ -3,8 +3,11 @@ import { Settings as SettingsIcon, Sparkles, Users, User, ChevronDown } from 'lu
 import {
   getLanguage,
   getUiTheme,
+  getTodayDate,
   setAuthSession,
-  setUserContext
+  setUserContext,
+  getData,
+  saveData
 } from '../utils/storage';
 import { isRtlLanguage } from '../constants/i18n';
 import { SCHOOLS } from '../constants/schools';
@@ -16,36 +19,46 @@ const TEXTS = {
     general: 'צפייה בנתוני הכיתה',
     personal: 'כניסה',
     generalHelp: 'צפייה בנתוני הכיתה מציגה סטטוס כיתה (גרפים יומיים/שבועיים) בלי נתונים אישיים.',
-    personalHelp: 'כניסה שומרת נתונים למכשיר/לתלמיד: צנצנת רגשות, משימות, בוט וסיכומים.',
+    personalHelp: 'מזינים שם תלמידה וקוד אישי. בפעם הראשונה בוחרים קוד אישי, ובפעמים הבאות משתמשים באותו שם ואותו קוד כדי להיכנס לאותו פרופיל.',
     school: 'בית ספר',
     class: 'כיתה',
-    studentName: 'שם תלמיד/ה',
-    studentNamePlaceholder: 'הזינו שם',
-    studentNameRequired: 'בכניסה אישית חובה להזין שם תלמיד/ה',
+    studentName: 'שם תלמידה',
+    studentNamePlaceholder: 'הזינו שם תלמידה',
+    studentNameHelp: 'הזיני את שם התלמידה. כדי להמשיך לאותו פרופיל בעתיד, השתמשי באותו שם.',
+    personalCode: 'קוד אישי',
+    personalCodePlaceholder: 'בחרו קוד אישי (לפחות 4 תווים)',
+    personalCodeRequired: 'חובה להזין קוד אישי',
+    personalCodeHelp: 'הקוד האישי פרטי. בפעם הראשונה בוחרים קוד אישי, ובפעמים הבאות משתמשים באותו קוד כדי לפתוח את אותו הפרופיל.',
+    studentNameRequired: 'שם תלמידה חובה להזין שם תלמיד/ה',
     schoolRequired: 'חובה לבחור בית ספר',
     classRequired: 'חובה להזין כיתה',
     schoolPlaceholder: 'בחרו בית ספר',
     classPlaceholder: 'לדוגמה: י׳2',
     enterGeneral: 'כניסה לנתוני כיתה',
-    enterPersonal: 'כניסה אישית'
+    enterPersonal: 'כניסה'
   },
   en: {
     title: 'System Login',
     general: 'Class View',
     personal: 'Login',
     generalHelp: 'Class view shows class status (daily/weekly charts) without personal data.',
-    personalHelp: 'Login stores individual data: emotion jar, tasks, bot, and summaries.',
+    personalHelp: 'Personal login uses student name and personal code. First time choose a personal code; next times use the same name and code to open the same profile.',
     school: 'School',
     class: 'Class',
     studentName: 'Student Name',
-    studentNamePlaceholder: 'Enter name',
+    studentNamePlaceholder: 'Enter student name',
+    studentNameHelp: 'Enter the student name. Use the same name next time to continue the same profile.',
+    personalCode: 'Personal Code',
+    personalCodePlaceholder: 'Choose personal code (at least 4 chars)',
+    personalCodeRequired: 'Personal login requires a personal code',
+    personalCodeHelp: 'Your personal code is private. First time choose it; next times use the same code to open the same profile.',
     studentNameRequired: 'Personal login requires a student name',
     schoolRequired: 'School is required',
     classRequired: 'Class is required',
     schoolPlaceholder: 'Select school',
     classPlaceholder: 'Example: 10-B',
     enterGeneral: 'Enter Class View',
-    enterPersonal: 'Enter Personal View'
+    enterPersonal: 'Enter'
   }
 };
 
@@ -60,6 +73,24 @@ const getDeviceId = () => {
   return value;
 };
 
+const normalizeKeyPart = (value, fallback = 'unknown') => {
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-');
+  return normalized || fallback;
+};
+
+const hashCode = (value) => {
+  const text = String(value || '');
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) + hash) + text.charCodeAt(index);
+    hash |= 0;
+  }
+  return Math.abs(hash).toString(36);
+};
+
 const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
   const language = getLanguage();
   const uiTheme = getUiTheme();
@@ -70,6 +101,7 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
   const [schoolId, setSchoolId] = useState('');
   const [classId, setClassId] = useState('');
   const [studentName, setStudentName] = useState('');
+  const [personalCode, setPersonalCode] = useState('');
   const [error, setError] = useState('');
   const [activeHelp, setActiveHelp] = useState(null); // 'general' | 'personal' | null
   const [isSchoolOpen, setIsSchoolOpen] = useState(false);
@@ -110,8 +142,13 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
   const handleLogin = () => {
     const normalizedClass = classId.trim();
     const normalizedName = studentName.trim();
+    const normalizedCode = personalCode.trim();
     const role = mode === 'general' ? 'general' : 'personal';
     const deviceId = getDeviceId();
+    const normalizedSchool = normalizeKeyPart(schoolId);
+    const normalizedClassKey = normalizeKeyPart(normalizedClass);
+    const normalizedNameKey = normalizeKeyPart(normalizedName, 'anonymous');
+    const normalizedCodeKey = normalizeKeyPart(normalizedCode, 'no-code');
 
     if (!schoolId) {
       setError(t.schoolRequired);
@@ -127,11 +164,27 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
       setError(t.studentNameRequired);
       return;
     }
+    if (role === 'personal' && normalizedCode.length < 4) {
+      setError(t.personalCodeRequired);
+      return;
+    }
 
     const userKey =
       role === 'general'
-        ? `general:${(schoolId || 'unknown').toLowerCase()}:${(normalizedClass || 'unknown').toLowerCase()}:${deviceId}`
-        : `personal:${deviceId}:${normalizedName.toLowerCase().replace(/\\s+/g, '-')}`;
+        ? `general:${normalizedSchool}:${normalizedClassKey}:${deviceId}`
+        : `personal:${normalizedSchool}:${normalizedClassKey}:${deviceId}:${normalizedNameKey}:${hashCode(normalizedCodeKey)}`;
+
+    if (role === 'personal') {
+      const legacyUserKey = `personal:${deviceId}:${normalizedNameKey}`;
+      if (legacyUserKey !== userKey) {
+        const data = getData();
+        if (data[legacyUserKey] && !data[userKey]) {
+          data[userKey] = data[legacyUserKey];
+          delete data[legacyUserKey];
+          saveData(data);
+        }
+      }
+    }
 
     const session = {
       role,
@@ -151,6 +204,28 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
     if (schoolId && normalizedClass) {
       setUserContext(userKey, { schoolId, classId: normalizedClass, entryMode: role });
     }
+
+    if (role === 'personal') {
+      const data = getData();
+      if (!data[userKey]) {
+        data[userKey] = {
+          dailyBottle: {},
+          weeklyData: {},
+          lastResetDate: getTodayDate(),
+          botMode: 'immediate',
+          botConversations: {},
+          language,
+          uiTheme,
+          bgPalette: 'calm',
+          bgMusic: 'off'
+        };
+        saveData(data);
+      } else if (!data[userKey].botMode) {
+        data[userKey].botMode = 'immediate';
+        saveData(data);
+      }
+    }
+
     onLogin(session);
   };
 
@@ -287,7 +362,10 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
 
             {mode === 'personal' && (
               <div>
-                <label className="block text-sm font-semibold text-slate-200 mb-2">{t.studentName}</label>
+                <div className={`flex items-center gap-2 mb-2 ${isRtl ? 'justify-start' : ''}`}>
+                  <label className="block text-sm font-semibold text-slate-200">{t.studentName}</label>
+                  {renderHelp('studentName', t.studentNameHelp)}
+                </div>
                 <input
                   type="text"
                   value={studentName}
@@ -297,6 +375,21 @@ const LoginScreen = ({ onLogin, onOpenSettings, isSettingsOpen }) => {
                   }}
                   placeholder={t.studentNamePlaceholder}
                   className="w-full px-4 py-3 border border-slate-600 bg-slate-800 rounded-xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+                <div className={`flex items-center gap-2 mb-2 mt-4 ${isRtl ? 'justify-start' : ''}`}>
+                  <label className="block text-sm font-semibold text-slate-200">{t.personalCode}</label>
+                  {renderHelp('personalCode', t.personalCodeHelp)}
+                </div>
+                <input
+                  type="password"
+                  value={personalCode}
+                  onChange={(e) => {
+                    setPersonalCode(e.target.value);
+                    setError('');
+                  }}
+                  placeholder={t.personalCodePlaceholder}
+                  className="w-full px-4 py-3 border border-slate-600 bg-slate-800 rounded-xl text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                  autoComplete="new-password"
                 />
               </div>
             )}

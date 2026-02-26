@@ -754,6 +754,7 @@ export const buildAdaptiveQuestionPlan = ({ emotionLabel, emotionId, language, m
         return pickOne([
           `${prefix}School detail: what exactly is coming up, and what part feels hardest?`,
           `${prefix}Is this about an assignment/test? What’s the most stressful piece?`,
+          `${prefix}When is the test/assignment due, and what part feels most stressful?`,
           `${prefix}What is the one school thing that is sitting on your mind the most?`
         ]);
       }
@@ -792,6 +793,7 @@ export const buildAdaptiveQuestionPlan = ({ emotionLabel, emotionId, language, m
       return pickOne([
         `${prefix}פרט לימודי: מה בדיוק עומד לקרות, ומה החלק שהכי מלחיץ?`,
         `${prefix}זה קשור למטלה/מבחן? מה החלק הכי קשה שם?`,
+        `${prefix}מתי המבחן/ההגשה, ומה החלק שהכי מלחיץ אותך בו?`,
         `${prefix}מה הדבר הלימודי שהכי “יושב לך בראש” כרגע?`
       ]);
     }

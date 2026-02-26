@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Sparkles, Calendar } from 'lucide-react';
+import { X, Send, Sparkles, Calendar, CheckCircle } from 'lucide-react';
 import { EMOTIONS } from '../constants/emotions';
-import { getDailySummary, getDominantEmotion } from '../utils/storage';
+import { getDailySummary, getDominantEmotion, getEmotionPatternInsights } from '../utils/storage';
 import {
   getProfessionalBotReply,
   getBotIntroText,
@@ -12,6 +12,7 @@ import {
 } from '../constants/botRecommendations';
 import { saveBotConversation, getLanguage, getUiTheme } from '../utils/storage';
 import { isRtlLanguage } from '../constants/i18n';
+import { extractTaskFromBotText } from '../utils/botTasks';
 
 const DailySummaryBot = ({ onClose }) => {
   const [messages, setMessages] = useState([]);
@@ -35,6 +36,31 @@ const DailySummaryBot = ({ onClose }) => {
   const uiTheme = getUiTheme();
   const isLight = uiTheme === 'light';
   const isRtl = isRtlLanguage(language);
+
+  const getCurrentQuestionId = () => {
+    const guidedQuestions = questionFlow.length
+      ? questionFlow
+      : [{ id: 'mainThing', text: getBotQuestionText({ questionId: 'mainThing', emotionName: '', language }) }];
+    return guidedQuestions[questionIndex]?.id || 'mainThing';
+  };
+
+  const getInputPlaceholder = () => {
+    const currentId = getCurrentQuestionId();
+    if (language === 'en') {
+      if (currentId === 'sleepHours') return 'e.g. 6.5';
+      if (currentId === 'energyLevel') return '0–10';
+      if (currentId === 'stressLevel') return '0–10';
+      if (currentId === 'helpNow') return 'What do you need right now?';
+      if (currentId === 'context') return 'Add one detail (optional)';
+      return 'Type your answer...';
+    }
+    if (currentId === 'sleepHours') return 'לדוגמה: 6.5';
+    if (currentId === 'energyLevel') return '0–10';
+    if (currentId === 'stressLevel') return '0–10';
+    if (currentId === 'helpNow') return 'מה היית צריך/ה עכשיו?';
+    if (currentId === 'context') return 'הוספת פרט אחד (לא חובה)';
+    return 'כתוב את התשובה שלך...';
+  };
 
   const queueTimeout = (callback, delay) => {
     const timeoutId = setTimeout(callback, delay);
@@ -62,7 +88,47 @@ const DailySummaryBot = ({ onClose }) => {
     const emotionLabel = language === 'en'
       ? `${emotion.emoji} ${emotion.nameEn || emotion.name}`
       : `${emotion.emoji} ${emotion.name}`;
-    setMessages([{ type: 'bot', text: getBotIntroText({ emotionLabel, language, mode: 'daily' }) }]);
+    const todayEmotionLines = Object.entries(dailySummary)
+      .filter(([, count]) => Number(count) > 0)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .slice(0, 5)
+      .map(([emotionId, count]) => {
+        const item = EMOTIONS[emotionId];
+        if (!item) return null;
+        return language === 'en'
+          ? `${item.emoji} ${item.nameEn || item.name}: ${count}`
+          : `${item.emoji} ${item.name}: ${count}`;
+      })
+      .filter(Boolean)
+      .join(language === 'en' ? ' | ' : ' | ');
+
+    const patterns = getEmotionPatternInsights();
+    const topNegative = (patterns.negativeFrequent || [])[0];
+    const topWeekday = (patterns.weekdayRecurring || [])[0];
+    const weekdayName = topWeekday
+      ? new Date(2026, 1, 22 + topWeekday.weekday).toLocaleDateString(language === 'en' ? 'en-US' : 'he-IL', { weekday: 'long' })
+      : null;
+    const topNegativeEmotion = topNegative ? EMOTIONS[topNegative.emotionId] : null;
+    const topWeekdayEmotion = topWeekday ? EMOTIONS[topWeekday.emotionId] : null;
+    const patternMessage =
+      topNegative || topWeekday
+        ? (language === 'en'
+          ? [
+              topNegative && topNegativeEmotion ? `Repeated pattern: ${topNegativeEmotion.emoji} ${topNegativeEmotion.nameEn || topNegativeEmotion.name} showed up on ${topNegative.daysCount} days.` : null,
+              topWeekday && topWeekdayEmotion ? `${topWeekdayEmotion.emoji} ${topWeekdayEmotion.nameEn || topWeekdayEmotion.name} often appears on ${weekdayName}.` : null
+            ].filter(Boolean).join(' ')
+          : [
+              topNegative && topNegativeEmotion ? `דפוס חוזר: ${topNegativeEmotion.emoji} ${topNegativeEmotion.name} הופיע/ה ב־${topNegative.daysCount} ימים.` : null,
+              topWeekday && topWeekdayEmotion ? `${topWeekdayEmotion.emoji} ${topWeekdayEmotion.name} מופיע/ה הרבה ביום ${weekdayName}.` : null
+            ].filter(Boolean).join(' '))
+        : null;
+
+    setMessages([
+      { type: 'bot', text: getBotIntroText({ emotionLabel, language, mode: 'daily' }) },
+      { type: 'bot', text: language === 'en' ? `Today I detected these emotions: ${todayEmotionLines}` : `עד עכשיו זיהיתי אצלך היום את הרגשות האלו: ${todayEmotionLines}` },
+      { type: 'bot', text: language === 'en' ? `Main emotion now: ${emotionLabel}. I’ll ask short questions and suggest one focused task.` : `הרגש המרכזי כרגע: ${emotionLabel}. אשאל כמה שאלות קצרות ואז אתן משימה ממוקדת.` },
+      ...(patternMessage ? [{ type: 'bot', text: patternMessage }] : [])
+    ]);
     setAnswers({
       mainThing: '',
       context: '',
@@ -203,10 +269,23 @@ const DailySummaryBot = ({ onClose }) => {
         answers: mergedAnswers,
         mode: 'daily'
       });
+
+      const taskFromChat = extractTaskFromBotText(reply.text, language) || reply.task || '';
       setMessages(prev => [...prev, { 
         type: 'bot', 
         text: reply.text
       }]);
+
+      if (taskFromChat) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            type: 'bot',
+            kind: 'task',
+            text: language === 'en' ? `Suggested task: ${taskFromChat}` : `משימה למעקב: ${taskFromChat}`
+          }
+        ]);
+      }
       setIsTyping(false);
 
       queueTimeout(() => {
@@ -230,7 +309,7 @@ const DailySummaryBot = ({ onClose }) => {
             stressLevel: mergedAnswers.stressLevel ?? null,
             helpNow: mergedAnswers.helpNow || '',
             recommendation: reply.text,
-            task: reply.task,
+            task: taskFromChat,
             timestamp: new Date().toISOString(),
             type: 'daily_summary'
           });
@@ -262,7 +341,13 @@ const DailySummaryBot = ({ onClose }) => {
             </div>
             <div>
               <h2 className="text-xl font-bold">{language === 'en' ? 'Daily Summary' : 'סיכום יומי'}</h2>
-              <p className="text-sm text-indigo-100">{language === 'en' ? 'Let\'s talk about your day' : 'בוא נדבר על היום שלך'}</p>
+              <p className="text-sm text-indigo-100">
+                {conversationPhase === 'waiting_answer'
+                  ? (language === 'en'
+                    ? `Question ${questionIndex + 1}/${Math.max(questionFlow.length || 0, 1)}`
+                    : `שאלה ${questionIndex + 1}/${Math.max(questionFlow.length || 0, 1)}`)
+                  : (language === 'en' ? 'Let\'s talk about your day' : 'בוא נדבר על היום שלך')}
+              </p>
             </div>
           </div>
           <button
@@ -284,14 +369,24 @@ const DailySummaryBot = ({ onClose }) => {
               <div className={`max-w-[85%] rounded-2xl p-4 ${
                 msg.type === 'user'
                   ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white'
-                  : isLight
-                    ? 'bg-white/95 border border-slate-200 text-slate-800 shadow-md'
-                    : 'bg-slate-800 border border-slate-700 text-slate-100 shadow-md'
+                  : msg.kind === 'task'
+                    ? (isLight
+                      ? 'bg-emerald-50 border border-emerald-200 text-slate-800 shadow-md'
+                      : 'bg-emerald-900/25 border border-emerald-500/25 text-slate-100 shadow-md')
+                    : isLight
+                      ? 'bg-white/95 border border-slate-200 text-slate-800 shadow-md'
+                      : 'bg-slate-800 border border-slate-700 text-slate-100 shadow-md'
               }`}>
                 {msg.type === 'bot' && (
                   <div className="flex items-center gap-2 mb-2">
-                    <Sparkles className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-indigo-300'}`} />
-                    <span className={`text-xs font-semibold ${isLight ? 'text-indigo-700' : 'text-indigo-200'}`}>{language === 'en' ? 'Mood Bot' : 'בוט מצב רוח'}</span>
+                    {msg.kind === 'task' ? (
+                      <CheckCircle className={`w-4 h-4 ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`} />
+                    ) : (
+                      <Sparkles className={`w-4 h-4 ${isLight ? 'text-indigo-600' : 'text-indigo-300'}`} />
+                    )}
+                    <span className={`text-xs font-semibold ${isLight ? 'text-indigo-700' : 'text-indigo-200'}`}>
+                      {msg.kind === 'task' ? (language === 'en' ? 'Task' : 'משימה') : (language === 'en' ? 'Mood Bot' : 'בוט מצב רוח')}
+                    </span>
                   </div>
                 )}
                 <p className={`${isRtl ? 'text-right' : 'text-left'} whitespace-pre-wrap leading-relaxed`}>{msg.text}</p>
@@ -318,27 +413,36 @@ const DailySummaryBot = ({ onClose }) => {
 
         <div className={`p-6 border-t rounded-b-3xl ${isLight ? 'border-slate-200 bg-white/90' : 'border-slate-700 bg-slate-900'}`}>
           {conversationPhase === 'waiting_answer' && (
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={language === 'en' ? 'Type your answer...' : 'כתוב את התשובה שלך...'}
-                className={`flex-1 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-500 placeholder:opacity-100 ${
-                  isLight
-                    ? 'border-slate-300 bg-white text-slate-900'
-                    : 'border-slate-600 bg-slate-800 text-slate-100'
-                }`}
-                dir={isRtl ? 'rtl' : 'ltr'}
-              />
-              <button
-                onClick={handleSend}
-                disabled={!inputValue.trim()}
-                className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Send className="w-5 h-5" />
-              </button>
+            <div className="flex flex-col gap-2">
+              {(getCurrentQuestionId() === 'energyLevel' || getCurrentQuestionId() === 'stressLevel' || getCurrentQuestionId() === 'sleepHours') && (
+                <div className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'} ${isRtl ? 'text-right' : 'text-left'}`}>
+                  {getCurrentQuestionId() === 'sleepHours'
+                    ? (language === 'en' ? 'Tip: you can use decimals (e.g. 6.5).' : 'טיפ: אפשר גם מספר עשרוני (למשל 6.5).')
+                    : (language === 'en' ? 'Tip: type a number 0–10.' : 'טיפ: כתוב/י מספר בין 0 ל־10.')}
+                </div>
+              )}
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={getInputPlaceholder()}
+                  className={`flex-1 px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-500 placeholder:opacity-100 ${
+                    isLight
+                      ? 'border-slate-300 bg-white text-slate-900'
+                      : 'border-slate-600 bg-slate-800 text-slate-100'
+                  }`}
+                  dir={isRtl ? 'rtl' : 'ltr'}
+                />
+                <button
+                  onClick={handleSend}
+                  disabled={!inputValue.trim()}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           )}
           {(conversationPhase === 'summary' || conversationPhase === 'no_data') && (

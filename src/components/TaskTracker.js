@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle, X, Clock3, ListTodo, ChevronDown, ChevronUp } from 'lucide-react';
 import { getBotDailySummary, saveTaskFeedback, updateBotConversationTask } from '../utils/storage';
 import { EMOTIONS } from '../constants/emotions';
 import { getLanguage, getUiTheme } from '../utils/storage';
 import { isRtlLanguage } from '../constants/i18n';
+import { getConversationTaskText } from '../utils/botTasks';
 
 const STATUS_LABEL = {
   he: {
@@ -38,6 +39,7 @@ const TaskTracker = ({ onClose, isModal = true }) => {
   const [afterEmotionId, setAfterEmotionId] = useState(null);
   const [reactionBurst, setReactionBurst] = useState([]);
   const [expandedTaskIds, setExpandedTaskIds] = useState({});
+  const completionFormRef = useRef(null);
   const language = getLanguage();
   const uiTheme = getUiTheme();
   const isLight = uiTheme === 'light';
@@ -46,12 +48,14 @@ const TaskTracker = ({ onClose, isModal = true }) => {
   const loadTasks = () => {
     const conversations = getBotDailySummary();
     const todayTasks = conversations
-      .filter(conv => conv.task)
-      .map(conv => ({
+      .map((conv) => {
+        const taskText = getConversationTaskText(conv, language);
+        if (!taskText) return null;
+        return ({
         id: conv.id || conv.timestamp,
         emotionName: conv.emotionName,
         emotionId: conv.emotionId || null,
-        task: conv.task || '',
+        task: taskText,
         recommendation: conv.recommendation || '',
         userAnswer: conv.userAnswer || '',
         context: conv.context || '',
@@ -67,7 +71,9 @@ const TaskTracker = ({ onClose, isModal = true }) => {
         afterEmotionId: conv.afterEmotionId || null,
         feedback: conv.feedback || conv.taskFeedback || '',
         moodChange: conv.moodChange || null
-      }))
+        });
+      })
+      .filter(Boolean)
       .sort((a, b) => new Date(b.updatedAt || b.timestamp || 0) - new Date(a.updatedAt || a.timestamp || 0));
     setTasks(todayTasks);
   };
@@ -75,6 +81,11 @@ const TaskTracker = ({ onClose, isModal = true }) => {
   useEffect(() => {
     loadTasks();
   }, []);
+
+  useEffect(() => {
+    if (!selectedTask || !completionFormRef.current) return;
+    completionFormRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [selectedTask]);
 
   const updateTask = (taskId, updates) => {
     const ok = updateBotConversationTask(taskId, updates);
@@ -438,7 +449,10 @@ const TaskTracker = ({ onClose, isModal = true }) => {
 
       {/* טופס השלמה */}
         {selectedTask && (
-          <div className={`border-t p-6 ${isLight ? 'border-slate-200 bg-white/85' : 'border-slate-700 bg-slate-800/50'}`}>
+          <div
+            ref={completionFormRef}
+            className={`border-t p-6 ${isLight ? 'border-slate-200 bg-white/85' : 'border-slate-700 bg-slate-800/50'}`}
+          >
             <h3 className={`text-lg font-bold mb-4 ${isLight ? 'text-slate-900' : 'text-white'}`}>
               {language === 'en' ? 'Complete task' : 'השלמת משימה'}
             </h3>

@@ -266,18 +266,18 @@ const Settings = ({ onBack, onThemePreview, onPalettePreview, onMusicPreview, is
               <h2 className="text-xl font-bold text-slate-100">{t(language, 'music')}</h2>
               {renderHelp('music', t(language, 'musicHelp'))}
             </div>
-            <div className="relative">
+            <div className={`relative ${isMusicOpen ? 'z-[130]' : ''}`}>
               <button
                 onClick={() => setIsMusicOpen((prev) => !prev)}
-                className={`w-full bg-slate-800 border-2 border-slate-600 hover:bg-slate-700 rounded-2xl px-4 py-3 text-slate-100 flex items-center justify-between transition-all ${isRtl ? 'flex-row-reverse' : ''}`}
+                className={`w-full bg-slate-800 border-2 border-slate-600 hover:bg-slate-700 rounded-2xl px-4 py-3 text-slate-100 flex items-center justify-between transition-all`}
                 dir={isRtl ? 'rtl' : 'ltr'}
               >
-                <span className="font-semibold">{selectedMusic.label}</span>
+                <span className={`font-semibold ${isRtl ? 'text-right' : 'text-left'}`}>{selectedMusic.label}</span>
                 <ChevronDown className={`w-5 h-5 text-cyan-300 transition-transform ${isMusicOpen ? 'rotate-180' : ''}`} />
               </button>
 
               {isMusicOpen && (
-                <div className="absolute z-20 bottom-full mb-2 w-full bg-slate-900/95 border border-slate-600 rounded-2xl shadow-2xl p-2 backdrop-blur-sm">
+                <div className="absolute z-[140] top-full mt-2 w-full bg-slate-900/95 border border-slate-600 rounded-2xl shadow-2xl p-2 backdrop-blur-sm">
                   <div className="space-y-2">
                     {musicOptions.map((option) => (
                       <button

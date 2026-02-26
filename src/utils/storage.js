@@ -1,5 +1,7 @@
 // ניהול שמירת נתונים ב-localStorage
 
+import { getConversationTaskText } from './botTasks';
+
 const APP_STORAGE_PREFIX = 'moodly';
 
 const STORAGE_KEY = `${APP_STORAGE_PREFIX}Data`;
@@ -215,7 +217,7 @@ export const getCurrentUserContext = () => {
   return getUserContext(userKey);
 };
 
-const addEmotionToClassAggregate = (schoolId, classId, date, emotionId) => {
+const addEmotionToClassAggregate = (schoolId, classId, date, emotionId, userKey) => {
   const aggregates = getClassAggregates();
   const classKey = getClassAggregateKey(schoolId, classId);
 
@@ -232,6 +234,15 @@ const addEmotionToClassAggregate = (schoolId, classId, date, emotionId) => {
   }
 
   aggregates[classKey][date][emotionId] += 1;
+  if (!aggregates[classKey].__participantsByDate) {
+    aggregates[classKey].__participantsByDate = {};
+  }
+  if (!aggregates[classKey].__participantsByDate[date]) {
+    aggregates[classKey].__participantsByDate[date] = {};
+  }
+  if (userKey) {
+    aggregates[classKey].__participantsByDate[date][userKey] = true;
+  }
   saveClassAggregates(aggregates);
 };
 
@@ -262,6 +273,97 @@ export const getCurrentClassWeeklyData = () => {
   const context = getCurrentUserContext();
   if (!context?.schoolId || !context?.classId) return {};
   return getClassWeeklyData(context.schoolId, context.classId);
+};
+
+const getClassWeeklyParticipantCount = (schoolId, classId) => {
+  const weekStart = getWeekStartDate();
+  const today = getTodayDate();
+  const aggregates = getClassAggregates();
+  const contexts = getUserContexts();
+  const data = getData();
+  const normalizedSchool = normalizeClassValue(schoolId);
+  const normalizedClass = normalizeClassValue(classId);
+  const classKey = getClassAggregateKey(normalizedSchool, normalizedClass);
+  const classAggregate = aggregates[classKey] || {};
+  const participantsByDateFromAggregate = classAggregate.__participantsByDate || {};
+  const weekStartDate = new Date(weekStart);
+  weekStartDate.setHours(0, 0, 0, 0);
+  const weekEndDate = new Date(weekStartDate);
+  weekEndDate.setDate(weekStartDate.getDate() + 6);
+
+  const aggregateByDate = {};
+  const aggregateWeeklyParticipants = new Set();
+
+  Object.entries(participantsByDateFromAggregate).forEach(([dateStr, userMap]) => {
+    const dateObj = new Date(dateStr);
+    dateObj.setHours(0, 0, 0, 0);
+    if (Number.isNaN(dateObj.getTime())) return;
+    if (dateObj < weekStartDate || dateObj > weekEndDate) return;
+    const dayParticipants = Object.keys(userMap || {});
+    aggregateByDate[dateStr] = dayParticipants.length;
+    dayParticipants.forEach((userKey) => aggregateWeeklyParticipants.add(userKey));
+  });
+
+  if (Object.keys(aggregateByDate).length > 0) {
+    return {
+      weeklyUnique: aggregateWeeklyParticipants.size,
+      todayUnique: aggregateByDate[today] || 0,
+      byDate: aggregateByDate
+    };
+  }
+
+  const hasAggregateEmotionData = Object.entries(classAggregate).some(([key, value]) => {
+    if (key === '__participantsByDate') return false;
+    return Object.values(value || {}).some((count) => Number(count || 0) > 0);
+  });
+
+  if (!hasAggregateEmotionData) {
+    return { weeklyUnique: 0, todayUnique: 0, byDate: {} };
+  }
+
+  const weeklyParticipants = new Set();
+  const participantsByDate = {};
+  Object.entries(contexts).forEach(([userKey, context]) => {
+    if (!context?.schoolId || !context?.classId) return;
+    if (normalizeClassValue(context.schoolId) !== normalizedSchool) return;
+    if (normalizeClassValue(context.classId) !== normalizedClass) return;
+
+    const weekData = data[userKey]?.weeklyData?.[weekStart] || {};
+    let hasWeekData = false;
+    Object.entries(weekData).forEach(([dateStr, dayData]) => {
+      const hasDayData = Object.values(dayData || {}).some((count) => Number(count || 0) > 0);
+      if (!hasDayData) return;
+      hasWeekData = true;
+      if (!participantsByDate[dateStr]) participantsByDate[dateStr] = new Set();
+      participantsByDate[dateStr].add(userKey);
+    });
+    if (hasWeekData) weeklyParticipants.add(userKey);
+  });
+
+  const byDate = {};
+  Object.entries(participantsByDate).forEach(([dateStr, participants]) => {
+    byDate[dateStr] = participants.size;
+  });
+
+  return {
+    weeklyUnique: weeklyParticipants.size,
+    todayUnique: byDate[today] || 0,
+    byDate
+  };
+};
+
+export const getCurrentClassWeeklyParticipantCount = () => {
+  const context = getCurrentUserContext();
+  if (!context?.schoolId || !context?.classId) return 0;
+  return getClassWeeklyParticipantCount(context.schoolId, context.classId).weeklyUnique;
+};
+
+export const getCurrentClassWeeklyParticipantStats = () => {
+  const context = getCurrentUserContext();
+  if (!context?.schoolId || !context?.classId) {
+    return { weeklyUnique: 0, todayUnique: 0, byDate: {} };
+  }
+  return getClassWeeklyParticipantCount(context.schoolId, context.classId);
 };
 
 // בדיקה אם היום הוא יום חדש (לאפס את הצנצנת)
@@ -314,7 +416,7 @@ export const addEmotionToBottle = (emotionId) => {
 
   userData.weeklyData[weekStart][today][emotionId]++;
   if (context?.schoolId && context?.classId) {
-    addEmotionToClassAggregate(context.schoolId, context.classId, today, emotionId);
+    addEmotionToClassAggregate(context.schoolId, context.classId, today, emotionId, username);
   }
 
   saveData(data);
@@ -370,6 +472,78 @@ export const getWeeklyData = () => {
   }
 
   return data[username].weeklyData[weekStart];
+};
+
+export const getEmotionPatternInsights = () => {
+  const data = getData();
+  const username = getCurrentUser();
+  if (!username) return { negativeFrequent: [], weekdayRecurring: [] };
+
+  const userData = data[username];
+  const weeklyData = userData?.weeklyData || {};
+  const dateMap = {};
+
+  Object.values(weeklyData).forEach((weekBlock) => {
+    Object.entries(weekBlock || {}).forEach(([dateStr, emotions]) => {
+      if (!dateMap[dateStr]) dateMap[dateStr] = {};
+      Object.entries(emotions || {}).forEach(([emotionId, count]) => {
+        dateMap[dateStr][emotionId] = (dateMap[dateStr][emotionId] || 0) + Number(count || 0);
+      });
+    });
+  });
+
+  const dates = Object.keys(dateMap).sort();
+  if (dates.length === 0) return { negativeFrequent: [], weekdayRecurring: [] };
+
+  const byEmotion = {};
+  dates.forEach((dateStr) => {
+    const emotions = dateMap[dateStr] || {};
+    const dateObj = new Date(dateStr);
+    const weekday = Number.isNaN(dateObj.getTime()) ? null : dateObj.getDay();
+    Object.entries(emotions).forEach(([emotionId, count]) => {
+      if (!byEmotion[emotionId]) {
+        byEmotion[emotionId] = {
+          totalCount: 0,
+          daysCount: 0,
+          weekdayCounts: {}
+        };
+      }
+      byEmotion[emotionId].totalCount += count;
+      if (count > 0) {
+        byEmotion[emotionId].daysCount += 1;
+        if (weekday !== null) {
+          byEmotion[emotionId].weekdayCounts[weekday] = (byEmotion[emotionId].weekdayCounts[weekday] || 0) + 1;
+        }
+      }
+    });
+  });
+
+  const negativeEmotionIds = ['sad', 'stress', 'anger', 'despair'];
+
+  const negativeFrequent = negativeEmotionIds
+    .map((emotionId) => ({
+      emotionId,
+      totalCount: byEmotion[emotionId]?.totalCount || 0,
+      daysCount: byEmotion[emotionId]?.daysCount || 0
+    }))
+    .filter((item) => item.daysCount >= 3 || item.totalCount >= 5)
+    .sort((a, b) => b.totalCount - a.totalCount);
+
+  const weekdayRecurring = Object.entries(byEmotion)
+    .map(([emotionId, stats]) => {
+      const best = Object.entries(stats.weekdayCounts || {}).sort((a, b) => b[1] - a[1])[0];
+      if (!best) return null;
+      return {
+        emotionId,
+        weekday: Number(best[0]),
+        times: Number(best[1]),
+        totalCount: stats.totalCount
+      };
+    })
+    .filter((item) => item && item.times >= 2)
+    .sort((a, b) => b.times - a.times);
+
+  return { negativeFrequent, weekdayRecurring };
 };
 
 // קבלת מצב הבוט של המשתמש
@@ -527,6 +701,7 @@ export const getBotDailySummary = () => {
   if (!username) return [];
 
   const today = getTodayDate();
+  const language = getLanguage();
 
   if (!data[username] || !data[username].botConversations) {
     return [];
@@ -536,19 +711,23 @@ export const getBotDailySummary = () => {
   let hasChanges = false;
 
   const normalized = conversations.map((conversation) => {
-    if (conversation.id && conversation.taskStatus) {
+    const derivedTask = getConversationTaskText(conversation, language);
+    const shouldPatchTask = Boolean(derivedTask) && String(conversation.task || '').trim() !== derivedTask;
+
+    if (conversation.id && conversation.taskStatus && !shouldPatchTask) {
       return conversation;
     }
 
     hasChanges = true;
     return {
       id: conversation.id || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      ...conversation,
       taskStatus: conversation.taskStatus || 'pending',
       taskMovedToTracker: Boolean(conversation.taskMovedToTracker),
       feedback: conversation.feedback || '',
       afterEmotionId: conversation.afterEmotionId || null,
       updatedAt: conversation.updatedAt || null,
-      ...conversation
+      task: derivedTask || conversation.task || ''
     };
   });
 
