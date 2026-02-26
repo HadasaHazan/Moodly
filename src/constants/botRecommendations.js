@@ -464,13 +464,14 @@ export const getProfessionalBotReply = ({ emotionId, emotionName, language, answ
           ? 'Keep it tiny: drink water + 2 minutes of movement.'
           : 'Quick reset: 3 slow breaths and relax your shoulders.';
 
+    const schoolDominant = topics.exam || (topics.school && !topics.conflict && (emotionId === 'stress' || emotionId === 'sad'));
     const action =
-      topics.exam || topics.school
-        ? 'School step: pick the *smallest* next action (10 minutes) and start it now.'
-        : topics.conflict
-          ? 'Conflict step: write one “I feel… I need…” sentence (no blame).'
-          : topics.loneliness
-            ? 'Connection step: message one safe person with one honest sentence.'
+      topics.conflict
+        ? 'Conflict step: write one “I feel… I need…” sentence (no blame).'
+        : topics.loneliness
+          ? 'Connection step: message one safe person with one honest sentence.'
+          : schoolDominant
+            ? 'School step: pick the *smallest* next action (10 minutes) and start it now.'
             : 'Next step: choose one small action you can do in the next 15 minutes.';
 
     const helpLine = helpNow ? `What you asked for: ${helpNow}` : null;
@@ -501,13 +502,14 @@ export const getProfessionalBotReply = ({ emotionId, emotionName, language, answ
         ? 'נלך על הכי קטן: כוס מים + 2 דקות תנועה.'
         : 'איפוס קצר: 3 נשימות איטיות ושחרור כתפיים.';
 
+  const schoolDominant = topics.exam || (topics.school && !topics.conflict && (emotionId === 'stress' || emotionId === 'sad'));
   const action =
-    topics.exam || topics.school
-      ? 'צעד לימודי: לבחור *את הצעד הכי קטן* (10 דקות) ולהתחיל עכשיו.'
-      : topics.conflict
-        ? 'צעד לקונפליקט: לנסח משפט “אני מרגיש/ה… ואני צריך/ה…” בלי האשמה.'
-        : topics.loneliness
-          ? 'צעד לחיבור: לשלוח הודעה לאדם בטוח במשפט אחד אמיתי.'
+    topics.conflict
+      ? 'צעד לקונפליקט: לנסח משפט “אני מרגיש/ה… ואני צריך/ה…” בלי האשמה.'
+      : topics.loneliness
+        ? 'צעד לחיבור: לשלוח הודעה לאדם בטוח במשפט אחד אמיתי.'
+        : schoolDominant
+          ? 'צעד לימודי: לבחור *את הצעד הכי קטן* (10 דקות) ולהתחיל עכשיו.'
           : 'צעד הבא: לבחור פעולה קטנה שאפשר לעשות ב־15 דקות הקרובות.';
 
   const helpLine = helpNow ? `מה שביקשת: ${helpNow}` : null;
@@ -552,7 +554,7 @@ const extractTopics = (rawText) => {
   const has = (needles) => needles.some((n) => text.includes(n));
   return {
     exam: has(['מבחן', 'מבחנים', 'בגרות', 'test', 'exam', 'quiz']),
-    school: has(['בית ספר', 'כיתה', 'שיעור', 'מורה', 'homework', 'school', 'class', 'teacher']),
+    school: has(['בית ספר', 'כיתה', 'שיעור', 'מורה', 'homework', 'school', 'teacher']),
     friends: has(['חבר', 'חברים', 'bestie', 'friend', 'friends']),
     family: has(['אמא', 'אבא', 'הורים', 'משפחה', 'mom', 'dad', 'parents', 'family']),
     conflict: has(['ריב', 'ויכוח', 'צעק', 'כעס', 'fight', 'argu', 'yell', 'conflict']),
@@ -563,7 +565,7 @@ const extractTopics = (rawText) => {
 };
 
 const topicLabel = (topics, language) => {
-  const order = ['exam', 'school', 'friends', 'family', 'conflict', 'loneliness', 'sleep', 'body'];
+  const order = ['conflict', 'exam', 'school', 'friends', 'family', 'loneliness', 'sleep', 'body'];
   const labelsHe = {
     exam: 'מבחנים/לחץ לימודי',
     school: 'מסגרת בית הספר',
@@ -750,19 +752,19 @@ export const buildAdaptiveQuestionPlan = ({ emotionLabel, emotionId, language, m
 
   const contextQuestionText = () => {
     if (language === 'en') {
-      if (topics.exam || topics.school) {
-        return pickOne([
-          `${prefix}School detail: what exactly is coming up, and what part feels hardest?`,
-          `${prefix}Is this about an assignment/test? What’s the most stressful piece?`,
-          `${prefix}When is the test/assignment due, and what part feels most stressful?`,
-          `${prefix}What is the one school thing that is sitting on your mind the most?`
-        ]);
-      }
       if (topics.conflict) {
         return pickOne([
           `${prefix}Conflict detail: what happened, and what do you wish the other side understood?`,
           `${prefix}In one sentence—what was the trigger and what do you need now?`,
           `${prefix}What part of the conflict feels unresolved?`
+        ]);
+      }
+      if (topics.exam || (topics.school && !topics.conflict)) {
+        return pickOne([
+          `${prefix}School detail: what exactly is coming up, and what part feels hardest?`,
+          `${prefix}Is this about an assignment/test? What’s the most stressful piece?`,
+          `${prefix}When is the test/assignment due, and what part feels most stressful?`,
+          `${prefix}What is the one school thing that is sitting on your mind the most?`
         ]);
       }
       if (topics.friends || topics.family) {
@@ -789,19 +791,19 @@ export const buildAdaptiveQuestionPlan = ({ emotionLabel, emotionId, language, m
       return getBotQuestionText({ questionId: 'context', emotionName: '', language });
     }
 
-    if (topics.exam || topics.school) {
-      return pickOne([
-        `${prefix}פרט לימודי: מה בדיוק עומד לקרות, ומה החלק שהכי מלחיץ?`,
-        `${prefix}זה קשור למטלה/מבחן? מה החלק הכי קשה שם?`,
-        `${prefix}מתי המבחן/ההגשה, ומה החלק שהכי מלחיץ אותך בו?`,
-        `${prefix}מה הדבר הלימודי שהכי “יושב לך בראש” כרגע?`
-      ]);
-    }
     if (topics.conflict) {
       return pickOne([
         `${prefix}פרט על הקונפליקט: מה קרה, ומה היית רוצה שיבינו?`,
         `${prefix}במשפט אחד—מה הפעיל את זה ומה אתה/את צריך/ה עכשיו?`,
         `${prefix}מה מרגיש עדיין לא פתור בסיטואציה?`
+      ]);
+    }
+    if (topics.exam || (topics.school && !topics.conflict)) {
+      return pickOne([
+        `${prefix}פרט לימודי: מה בדיוק עומד לקרות, ומה החלק שהכי מלחיץ?`,
+        `${prefix}זה קשור למטלה/מבחן? מה החלק הכי קשה שם?`,
+        `${prefix}מתי המבחן/ההגשה, ומה החלק שהכי מלחיץ אותך בו?`,
+        `${prefix}מה הדבר הלימודי שהכי “יושב לך בראש” כרגע?`
       ]);
     }
     if (topics.friends || topics.family) {
@@ -837,7 +839,7 @@ export const buildAdaptiveQuestionPlan = ({ emotionLabel, emotionId, language, m
   // One context-specific question (professionally narrows the situation).
   ids.push('context');
 
-  if (topics.exam || topics.school) {
+  if (topics.exam || (topics.school && !topics.conflict && !topics.friends && !topics.family)) {
     ids.push('stressLevel');
   } else if (topics.conflict || topics.friends || topics.family) {
     ids.push('stressLevel');

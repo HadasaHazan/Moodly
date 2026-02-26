@@ -205,8 +205,8 @@ const TaskTracker = ({ onClose, isModal = true }) => {
     }
 
     return (
-      <div className={screenWrapperClassName}>
-        <div className={screenInnerClassName}>{emptyBody}</div>
+      <div className={`${screenWrapperClassName} flex items-center justify-center`}>
+        <div className="w-full flex justify-center">{emptyBody}</div>
       </div>
     );
   }
